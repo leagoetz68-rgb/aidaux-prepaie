@@ -9,229 +9,335 @@
   :root {
     --teal: #00BBB4;
     --teal-dark: #000F9F;
+    --indigo: #101a6b;
     --orange: #FF4713;
-    --bg: #f4f7f7;
+    --violet: #6A1B9A;
+    --bg: #eef2f5;
     --card: #ffffff;
-    --text: #223;
-    --muted: #6b7a7a;
-    --border: #dfe7e6;
-    --head: #d7e8e2;
-    --yellow: #fff23f;
+    --text: #1f2a37;
+    --muted: #6b7a86;
+    --border: #e4ebef;
+    --border-strong: #d3dde3;
+    --yellow: #ffe14d;
     --red: #e53935;
-    --grey: #9aa4a4;
+    --grey: #aab4bc;
+    --shadow: 0 10px 30px rgba(16,26,107,0.08);
+    --shadow-sm: 0 2px 8px rgba(16,26,107,0.06);
   }
   * { box-sizing: border-box; }
+  html, body { height: 100%; }
   body {
     margin: 0;
-    font-family: "Segoe UI", Arial, sans-serif;
-    background: var(--bg);
+    font-family: "Inter", "Segoe UI", system-ui, Arial, sans-serif;
+    background:
+      radial-gradient(1100px 500px at 100% -10%, rgba(0,187,180,0.10), transparent 60%),
+      radial-gradient(900px 500px at -10% 0%, rgba(106,27,154,0.08), transparent 55%),
+      var(--bg);
     color: var(--text);
     min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
   }
+
+  /* ---- Header ---- */
   .topbar {
-    background: #fff;
-    padding: 12px 24px;
+    background: linear-gradient(100deg, #0a1560 0%, #1a2aa0 55%, #00BBB4 140%);
+    color: #fff;
+    padding: 16px 28px;
     display: flex;
     align-items: center;
     gap: 16px;
-    border-bottom: 3px solid var(--orange);
-    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    box-shadow: var(--shadow-sm);
   }
-  .topbar img { height: 44px; }
-  .topbar h1 {
-    color: var(--teal-dark);
-    font-size: 1.2rem;
-    margin: 0;
+  .brand { display: flex; align-items: center; gap: 14px; }
+  .brand .logo-badge {
+    width: 46px; height: 46px;
+    background: #fff; border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.18);
   }
+  .brand .logo-badge img { height: 34px; display: block; }
+  .brand .titles h1 { font-size: 1.18rem; margin: 0; font-weight: 700; letter-spacing: .2px; }
+  .brand .titles p { margin: 2px 0 0; font-size: .8rem; color: rgba(255,255,255,.8); }
   .topbar a.back {
     margin-left: auto;
-    color: var(--teal-dark);
+    color: #fff;
     text-decoration: none;
-    font-size: 0.9rem;
+    font-size: .88rem;
     font-weight: 600;
-    border: 1px solid var(--border);
-    padding: 7px 14px;
-    border-radius: 6px;
+    border: 1px solid rgba(255,255,255,.35);
+    padding: 8px 16px;
+    border-radius: 999px;
+    transition: background .15s ease;
+    backdrop-filter: blur(4px);
   }
-  .topbar a.back:hover { background: var(--bg); }
+  .topbar a.back:hover { background: rgba(255,255,255,.15); }
 
+  .container { max-width: 1500px; margin: 0 auto; padding: 22px 24px 60px; }
+
+  /* ---- Toolbar card ---- */
   .toolbar {
     display: flex;
     flex-wrap: wrap;
-    gap: 12px;
-    align-items: flex-end;
-    padding: 18px 24px 8px;
-  }
-  .field { display: flex; flex-direction: column; gap: 4px; }
-  .field label {
-    font-size: 0.72rem;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    color: var(--muted);
-    font-weight: 600;
-  }
-  select, .toolbar input[type=text] {
-    padding: 8px 10px;
+    gap: 16px;
+    align-items: center;
+    background: var(--card);
     border: 1px solid var(--border);
-    border-radius: 6px;
-    font-size: 0.92rem;
-    background: #fff;
-    min-width: 160px;
+    border-radius: 16px;
+    padding: 16px 18px;
+    box-shadow: var(--shadow-sm);
   }
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field label {
+    font-size: .68rem;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--muted);
+    font-weight: 700;
+  }
+  .select-wrap { position: relative; }
+  select {
+    appearance: none;
+    padding: 10px 38px 10px 14px;
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
+    font-size: .95rem;
+    font-weight: 600;
+    color: var(--indigo);
+    background: #fff;
+    min-width: 180px;
+    cursor: pointer;
+    transition: border-color .15s ease, box-shadow .15s ease;
+  }
+  select:hover { border-color: var(--teal); }
+  select:focus { outline: none; border-color: var(--teal); box-shadow: 0 0 0 3px rgba(0,187,180,.2); }
+  .select-wrap::after {
+    content: "▾";
+    position: absolute; right: 14px; top: 50%;
+    transform: translateY(-50%);
+    color: var(--muted); font-size: .8rem; pointer-events: none;
+  }
+  .spacer { flex: 1; }
+
   .btn {
-    padding: 8px 16px;
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 10px 18px;
     border: none;
-    border-radius: 6px;
-    font-size: 0.9rem;
+    border-radius: 10px;
+    font-size: .9rem;
     font-weight: 600;
     cursor: pointer;
     color: #fff;
     background: var(--orange);
+    box-shadow: 0 4px 12px rgba(255,71,19,.28);
+    transition: transform .12s ease, box-shadow .12s ease, background .15s ease;
   }
-  .btn:hover { background: #d93a0f; }
-  .btn.secondary { background: var(--teal-dark); }
+  .btn:hover { background: #e8390c; transform: translateY(-1px); }
+  .btn:active { transform: translateY(0); }
+  .btn.secondary { background: var(--teal-dark); box-shadow: 0 4px 12px rgba(16,26,107,.25); }
   .btn.secondary:hover { background: #000b6e; }
-  .btn.ghost { background: #fff; color: var(--teal-dark); border: 1px solid var(--border); }
-  .btn.ghost:hover { background: var(--bg); }
-  .spacer { flex: 1; }
-
-  .meta {
-    padding: 0 24px;
-    font-size: 0.8rem;
-    color: var(--muted);
+  .btn.ghost {
+    background: #fff; color: var(--indigo);
+    border: 1px solid var(--border-strong); box-shadow: none;
   }
+  .btn.ghost:hover { background: #f3f7f9; border-color: var(--teal); }
 
-  .table-wrap {
-    margin: 12px 24px 40px;
-    overflow-x: auto;
-    background: #fff;
+  /* ---- Stat chips ---- */
+  .stats { display: flex; flex-wrap: wrap; gap: 12px; margin: 18px 0 6px; }
+  .chip {
+    display: flex; align-items: center; gap: 12px;
+    background: var(--card);
     border: 1px solid var(--border);
-    border-radius: 10px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    border-radius: 14px;
+    padding: 12px 16px;
+    box-shadow: var(--shadow-sm);
+    min-width: 150px;
   }
-  table { border-collapse: collapse; width: 100%; font-size: 0.82rem; }
+  .chip .ic {
+    width: 38px; height: 38px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.1rem; color: #fff; flex: none;
+  }
+  .chip .ic.a { background: linear-gradient(135deg,#00BBB4,#0a9a94); }
+  .chip .ic.b { background: linear-gradient(135deg,#6A1B9A,#8e24aa); }
+  .chip .ic.c { background: linear-gradient(135deg,#1a2aa0,#3949ab); }
+  .chip .k { font-size: .68rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 700; }
+  .chip .v { font-size: 1.02rem; font-weight: 700; color: var(--indigo); line-height: 1.1; }
+
+  /* ---- Legend ---- */
+  .legend {
+    display: flex; gap: 18px; flex-wrap: wrap;
+    font-size: .78rem; color: var(--muted);
+    align-items: center; margin: 12px 2px 14px;
+  }
+  .legend span { display: inline-flex; align-items: center; gap: 7px; }
+  .swatch { width: 15px; height: 15px; border-radius: 4px; border: 1px solid #0002; display: inline-block; }
+  .legend .hint { margin-left: auto; font-style: italic; }
+
+  /* ---- Table ---- */
+  .table-wrap {
+    overflow-x: auto;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    box-shadow: var(--shadow);
+  }
+  table { border-collapse: separate; border-spacing: 0; width: 100%; font-size: .84rem; }
   thead th {
-    background: var(--head);
-    color: #1a3a34;
+    background: #f4f8fa;
+    color: var(--indigo);
     font-weight: 700;
-    padding: 8px 6px;
-    border: 1px solid #c3d6cf;
+    padding: 11px 8px;
+    border-bottom: 1px solid var(--border-strong);
+    border-right: 1px solid var(--border);
     text-align: center;
     position: sticky;
     top: 0;
+    z-index: 3;
     white-space: nowrap;
   }
-  thead tr.sub th { background: #c9ddd6; font-size: 0.74rem; font-weight: 600; }
+  thead tr.sub th {
+    background: #eaf1f4;
+    font-size: .74rem;
+    font-weight: 600;
+    color: #3b4a72;
+    top: 44px;
+  }
+  thead th.group { background: #e7eefc; color: #26348c; }
+
   tbody td {
-    border: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    border-right: 1px solid var(--border);
     padding: 0;
     text-align: center;
     vertical-align: middle;
   }
+  tbody tr:hover td { background: #f6fbfc; }
+  tbody tr:hover td.name { background: #eef8f7; }
+
+  /* sticky first columns */
+  td.rownum, th.rownum { position: sticky; left: 0; z-index: 2; }
+  td.name, thead th.hname { position: sticky; left: 44px; z-index: 2; }
+  thead th.rownum, thead th.hname { z-index: 4; }
+
   tbody td.name {
     text-align: left;
     font-weight: 600;
     white-space: nowrap;
-    padding: 0 6px;
-    background: #fafcfb;
+    padding: 0 8px;
+    background: #fbfdfd;
+    box-shadow: 1px 0 0 var(--border);
   }
-  tbody tr:nth-child(even) td.name { background: #f2f7f5; }
+  tbody tr:nth-child(even) td.name { background: #f5f9f9; }
+
   tbody input {
     width: 100%;
     border: none;
     background: transparent;
-    padding: 6px 5px;
+    padding: 9px 6px;
     font: inherit;
     text-align: center;
-    min-width: 68px;
+    min-width: 74px;
+    color: var(--text);
   }
-  tbody td.name input { text-align: left; font-weight: 600; min-width: 150px; }
-  tbody input:focus { outline: 2px solid var(--teal); outline-offset: -2px; background: #fff; }
-  td.hl-yellow input { background: var(--yellow); }
-  td.hl-red input { background: var(--red); color: #fff; font-weight: 700; }
-  td.hl-grey { background: var(--grey); }
+  tbody td.name input { text-align: left; font-weight: 600; min-width: 158px; color: var(--indigo); }
+  tbody input:focus {
+    outline: none;
+    box-shadow: inset 0 0 0 2px var(--teal);
+    background: #fff;
+    border-radius: 6px;
+  }
+  td.hl-yellow input { background: var(--yellow); border-radius: 6px; font-weight: 600; }
+  td.hl-red input { background: var(--red); color: #fff; font-weight: 700; border-radius: 6px; }
+  td.hl-grey { background: repeating-linear-gradient(45deg,#aab4bc,#aab4bc 6px,#9ba6ae 6px,#9ba6ae 12px); }
+
   td.rownum {
-    background: #eef4f2;
+    background: #f0f5f7;
     color: var(--muted);
-    font-size: 0.7rem;
-    width: 26px;
-    padding: 0 2px;
+    font-size: .72rem;
+    font-weight: 600;
+    width: 44px;
+    text-align: center;
+    box-shadow: 1px 0 0 var(--border);
   }
-  td.del { width: 30px; }
+  th.rownum { width: 44px; }
+
+  td.del { width: 42px; }
   td.del button {
     border: none;
     background: transparent;
-    color: var(--red);
+    color: #c2c9d0;
     cursor: pointer;
     font-size: 1rem;
     line-height: 1;
-    padding: 4px 6px;
+    padding: 6px 8px;
+    border-radius: 8px;
+    transition: color .12s ease, background .12s ease;
   }
-  td.del button:hover { color: #a00; }
+  td.del button:hover { color: var(--red); background: #fdeceb; }
 
-  .row-actions { padding: 0 24px 40px; }
-
-  .legend {
-    padding: 4px 24px 0;
-    display: flex;
-    gap: 18px;
-    flex-wrap: wrap;
-    font-size: 0.75rem;
-    color: var(--muted);
-    align-items: center;
-  }
-  .legend span { display: inline-flex; align-items: center; gap: 6px; }
-  .swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid #0002; display: inline-block; }
+  .row-actions { margin-top: 16px; }
 
   @media print {
-    .topbar a.back, .toolbar, .row-actions, td.del, .legend .hint { display: none !important; }
-    .table-wrap { box-shadow: none; border: none; margin: 0; }
+    .topbar a.back, .toolbar, .row-actions, td.del, .legend .hint, .stats { display: none !important; }
     body { background: #fff; }
+    .container { padding: 0; max-width: none; }
+    .table-wrap { box-shadow: none; border: none; }
+    .topbar { background: #101a6b !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   }
 </style>
 </head>
 <body>
   <div class="topbar">
-    <img src="logo.png" alt="AID'AUX">
-    <h1>Pré-paie</h1>
+    <div class="brand">
+      <div class="logo-badge"><img src="logo.png" alt="AID'AUX"></div>
+      <div class="titles">
+        <h1>Aid'Aux Pré-paie</h1>
+        <p>Éléments variables de paie — par agence & par mois</p>
+      </div>
+    </div>
     <a class="back" href="https://aidaux-portail.vercel.app">← Portail</a>
   </div>
 
-  <div class="toolbar">
-    <div class="field">
-      <label for="agence">Agence</label>
-      <select id="agence"></select>
+  <div class="container">
+    <div class="toolbar">
+      <div class="field">
+        <label for="agence">Agence</label>
+        <div class="select-wrap"><select id="agence"></select></div>
+      </div>
+      <div class="field">
+        <label for="mois">Mois</label>
+        <div class="select-wrap"><select id="mois"></select></div>
+      </div>
+      <div class="spacer"></div>
+      <button class="btn" id="addRow">＋ Salarié</button>
+      <button class="btn secondary" id="exportCsv">⬇ Export CSV</button>
+      <button class="btn ghost" id="printBtn">🖨 Imprimer</button>
     </div>
-    <div class="field">
-      <label for="mois">Mois</label>
-      <select id="mois"></select>
+
+    <div class="stats">
+      <div class="chip"><div class="ic a">🏢</div><div><div class="k">Agence</div><div class="v" id="statAgence">—</div></div></div>
+      <div class="chip"><div class="ic b">📅</div><div><div class="k">Mois</div><div class="v" id="statMois">—</div></div></div>
+      <div class="chip"><div class="ic c">👥</div><div><div class="k">Salariés</div><div class="v" id="statCount">—</div></div></div>
     </div>
-    <div class="spacer"></div>
-    <button class="btn" id="addRow">+ Salarié</button>
-    <button class="btn secondary" id="exportCsv">Export CSV</button>
-    <button class="btn ghost" id="printBtn">Imprimer</button>
-  </div>
 
-  <div class="legend">
-    <span><i class="swatch" style="background:#fff23f"></i> Date à surveiller</span>
-    <span><i class="swatch" style="background:#e53935"></i> Absence / alerte</span>
-    <span><i class="swatch" style="background:#9aa4a4"></i> Sans objet</span>
-    <span class="hint" style="margin-left:auto">Astuce : double-cliquez sur une cellule pour changer sa couleur.</span>
-  </div>
+    <div class="legend">
+      <span><i class="swatch" style="background:#ffe14d"></i> Date à surveiller</span>
+      <span><i class="swatch" style="background:#e53935"></i> Absence / alerte</span>
+      <span><i class="swatch" style="background:#aab4bc"></i> Sans objet</span>
+      <span class="hint">Astuce : double-cliquez sur une cellule pour changer sa couleur.</span>
+    </div>
 
-  <div class="meta" id="meta"></div>
-
-  <div class="table-wrap">
+    <div class="table-wrap">
     <table id="grid">
       <thead>
         <tr>
           <th rowspan="2" class="rownum">#</th>
-          <th rowspan="2">Salarié</th>
+          <th rowspan="2" class="hname">Salarié</th>
           <th rowspan="2">Date d'embauche</th>
           <th rowspan="2">Contrat</th>
           <th rowspan="2">Avenant M-1</th>
           <th rowspan="2">Avenant</th>
-          <th colspan="2">Ticket resto</th>
+          <th colspan="2" class="group">Ticket resto</th>
           <th rowspan="2">Titre de transport</th>
           <th rowspan="2">Forfait KMS</th>
           <th rowspan="2">KMS PDT</th>
@@ -247,10 +353,11 @@
       </thead>
       <tbody id="tbody"></tbody>
     </table>
-  </div>
+    </div>
 
-  <div class="row-actions">
-    <button class="btn ghost" id="addRow2">+ Ajouter un salarié</button>
+    <div class="row-actions">
+      <button class="btn ghost" id="addRow2">＋ Ajouter un salarié</button>
+    </div>
   </div>
 
 <script>
@@ -430,8 +537,9 @@ function render() {
     tbody.appendChild(tr);
   });
 
-  document.getElementById("meta").textContent =
-    AGENCES[curAgence].nom + " — " + curMois + " · " + rows.length + " salarié(s)";
+  document.getElementById("statAgence").textContent = AGENCES[curAgence].nom;
+  document.getElementById("statMois").textContent = curMois;
+  document.getElementById("statCount").textContent = rows.length;
 }
 
 function addRow() {
