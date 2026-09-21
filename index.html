@@ -7,22 +7,21 @@
 <link rel="icon" type="image/x-icon" href="favicon.ico">
 <style>
   :root {
+    /* Palette AID'AUX : turquoise, bleu marine, orange + neutres */
     --teal: #00BBB4;
-    --teal-dark: #000F9F;
-    --indigo: #101a6b;
+    --teal-dark: #0a8f88;
+    --navy: #000F9F;
+    --navy-deep: #0a1560;
+    --indigo: #000F9F;
     --orange: #FF4713;
-    --violet: #6A1B9A;
     --bg: #eef2f5;
     --card: #ffffff;
     --text: #1f2a37;
     --muted: #6b7a86;
     --border: #e4ebef;
     --border-strong: #d3dde3;
-    --yellow: #ffe14d;
-    --red: #e53935;
-    --grey: #aab4bc;
-    --shadow: 0 10px 30px rgba(16,26,107,0.08);
-    --shadow-sm: 0 2px 8px rgba(16,26,107,0.06);
+    --shadow: 0 10px 30px rgba(0,15,159,0.08);
+    --shadow-sm: 0 2px 8px rgba(0,15,159,0.06);
   }
   * { box-sizing: border-box; }
   html, body { height: 100%; }
@@ -158,8 +157,8 @@
     font-size: 1.1rem; color: #fff; flex: none;
   }
   .chip .ic.a { background: linear-gradient(135deg,#00BBB4,#0a9a94); }
-  .chip .ic.b { background: linear-gradient(135deg,#6A1B9A,#8e24aa); }
-  .chip .ic.c { background: linear-gradient(135deg,#1a2aa0,#3949ab); }
+  .chip .ic.b { background: linear-gradient(135deg,#FF4713,#e8390c); }
+  .chip .ic.c { background: linear-gradient(135deg,#000F9F,#0a1560); }
   .chip .k { font-size: .68rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 700; }
   .chip .v { font-size: 1.02rem; font-weight: 700; color: var(--indigo); line-height: 1.1; }
 
@@ -247,16 +246,18 @@
     background: #fff;
     border-radius: 6px;
   }
-  td.hl-yellow input { background: var(--yellow); border-radius: 6px; font-weight: 600; }
-  td.hl-red input { background: var(--red); color: #fff; font-weight: 700; border-radius: 6px; }
-  td.hl-black input { background: #1f2530; color: #fff; font-weight: 700; border-radius: 6px; }
+  /* surlignage aux couleurs AID'AUX */
+  td.hl-teal   input { background: var(--teal);   color:#fff; font-weight: 700; border-radius: 6px; }
+  td.hl-orange input { background: var(--orange); color:#fff; font-weight: 700; border-radius: 6px; }
+  td.hl-navy   input { background: var(--navy);   color:#fff; font-weight: 700; border-radius: 6px; }
   /* un champ désactivé ne doit pas bloquer le double-clic sur la cellule */
   tbody input:disabled { pointer-events: none; }
-  td.hl-red input::placeholder, td.hl-black input::placeholder { color:#fff; opacity:.95; font-weight:700; }
-  td.hl-grey { background: repeating-linear-gradient(45deg,#aab4bc,#aab4bc 6px,#9ba6ae 6px,#9ba6ae 12px); }
+  td.hl-teal input::placeholder,
+  td.hl-orange input::placeholder,
+  td.hl-navy input::placeholder { color:#fff; opacity:.95; font-weight:700; }
 
   /* Ticket resto : déblocage auto */
-  .th-sub { display:block; font-size:.62rem; font-weight:600; color:#5b6bb0; margin-top:2px; }
+  .th-sub { display:block; font-size:.62rem; font-weight:600; color:var(--teal-dark); margin-top:2px; }
   td.tr-lock {
     position: relative;
     background: #f2f5f8;
@@ -272,8 +273,8 @@
   }
   td.tr-lock input { cursor: not-allowed; color: transparent; }
   td.tr-lock input::placeholder { color: transparent; }
-  td.tr-ok { background: #eafaf6; }
-  td.tr-ok input { color:#0a7d54; font-weight:600; }
+  td.tr-ok { background: #e6f7f6; }
+  td.tr-ok input { color: var(--teal-dark); font-weight:600; }
 
   td.rownum {
     background: #f0f5f7;
@@ -298,7 +299,7 @@
     border-radius: 8px;
     transition: color .12s ease, background .12s ease;
   }
-  td.del button:hover { color: var(--red); background: #fdeceb; }
+  td.del button:hover { color: var(--orange); background: #ffe9e2; }
 
   .row-actions { margin-top: 16px; }
 
@@ -347,7 +348,7 @@
 
     <div class="legend">
       <span><i class="swatch" style="background:#dfe4ea"></i> 🔒 Ticket resto verrouillé (période d'essai)</span>
-      <span class="hint">Ticket resto : déblocage auto après 2 mois d'essai. Double-cliquez la case pour la marquer rouge/noir = « ne bénéficie pas ».</span>
+      <span class="hint">Ticket resto : déblocage auto après 2 mois d'essai. Double-cliquez la case pour la marquer « NON » (ne bénéficie pas).</span>
     </div>
 
     <div class="table-wrap">
@@ -401,8 +402,9 @@ const HEADERS = ["Salarié","Date d'embauche","Contrat","Avenant M-1","Avenant",
   "Ticket resto (Nbre)","Titre de transport","Forfait KMS","KMS PDT",
   "Avantage nature","Acompte","Divers"];
 
-// cycle des couleurs au double-clic
-const HL = ["", "hl-yellow", "hl-red", "hl-black", "hl-grey"];
+// cycle des couleurs au double-clic (couleurs AID'AUX)
+const HL = ["", "hl-teal", "hl-orange", "hl-navy"];
+const TICKET_MARKS = ["hl-orange", "hl-navy"]; // = « ne bénéficie pas »
 
 // ---- Agences & effectifs de départ ----
 const AGENCES = {
@@ -558,10 +560,10 @@ function render() {
     COLS.forEach(col => {
       const td = document.createElement("td");
       if (col.type === "name") td.className = "name";
-      // La case Ticket resto n'accepte que rouge/noir ; on nettoie tout autre
-      // marquage (jaune/gris) resté coincé.
+      // La case Ticket resto n'accepte que le marquage « ne bénéficie pas » ;
+      // on nettoie tout autre marquage (anciennes couleurs) resté coincé.
       if (col.type === "ticket" && row._hl[col.key]
-          && row._hl[col.key] !== "hl-red" && row._hl[col.key] !== "hl-black") {
+          && TICKET_MARKS.indexOf(row._hl[col.key]) < 0) {
         row._hl[col.key] = "";
         saveStore();
       }
@@ -569,7 +571,7 @@ function render() {
       if (hl) td.classList.add(hl);
 
       // cycle de couleurs propre à chaque type de colonne
-      const cycle = (col.type === "ticket") ? ["", "hl-red", "hl-black"] : HL;
+      const cycle = (col.type === "ticket") ? ["", "hl-orange", "hl-navy"] : HL;
 
       const inp = document.createElement("input");
       inp.type = "text";
@@ -594,7 +596,7 @@ function render() {
           // Une couleur posée à la main = statut manuel (ex : ne bénéficie pas)
           inp.disabled = true;
           inp.value = "";
-          if (hl === "hl-red" || hl === "hl-black") {
+          if (TICKET_MARKS.indexOf(hl) >= 0) {
             inp.placeholder = "NON";
             td.title = "Ne bénéficie pas des titres restaurant";
           }
