@@ -162,6 +162,32 @@
   .chip .k { font-size: .68rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 700; }
   .chip .v { font-size: 1.02rem; font-weight: 700; color: var(--indigo); line-height: 1.1; }
 
+  /* ---- Tabs ---- */
+  .tabs { display: flex; gap: 6px; margin: 20px 0 0; flex-wrap: wrap; }
+  .tab {
+    padding: 10px 18px;
+    border: 1px solid var(--border-strong);
+    border-bottom: none;
+    border-radius: 12px 12px 0 0;
+    background: #eef2f5;
+    color: var(--muted);
+    font-size: .9rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background .12s ease, color .12s ease;
+  }
+  .tab:hover { background: #e4eaef; color: var(--navy); }
+  .tab.active {
+    background: var(--card);
+    color: var(--navy);
+    box-shadow: 0 -2px 6px rgba(0,15,159,.06);
+    position: relative;
+  }
+  .tab.active::after {
+    content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px;
+    background: var(--teal); border-radius: 3px 3px 0 0;
+  }
+
   /* ---- Legend ---- */
   .legend {
     display: flex; gap: 18px; flex-wrap: wrap;
@@ -240,6 +266,7 @@
   }
   tbody td.name input { text-align: left; font-weight: 600; min-width: 210px; color: var(--indigo); }
   thead th.hname { min-width: 222px; text-align: left; padding-left: 12px; }
+  tbody td.wide input { text-align: left; min-width: 320px; }
   tbody input:focus {
     outline: none;
     box-shadow: inset 0 0 0 2px var(--teal);
@@ -341,31 +368,16 @@
       <div class="chip"><div class="ic a">👥</div><div><div class="k">Salariés</div><div class="v" id="statCount">—</div></div></div>
     </div>
 
-    <div class="legend">
+    <div class="tabs" id="tabs"></div>
+
+    <div class="legend" id="legend">
       <span><i class="swatch" style="background:#f0f3f6"></i> « dès MM/AA » = ouverture après la période d'essai</span>
       <span class="hint">Ticket resto : déblocage auto après 2 mois d'essai. Double-cliquez la case pour la marquer « NON » (ne bénéficie pas).</span>
     </div>
 
     <div class="table-wrap">
     <table id="grid">
-      <thead>
-        <tr>
-          <th class="rownum">#</th>
-          <th class="hname">Salarié</th>
-          <th>Date d'embauche</th>
-          <th>Contrat</th>
-          <th>Avenant<br><span class="th-sub">nouveau contrat (h)</span></th>
-          <th>Date de signature<br><span class="th-sub">de l'avenant (jj/mm/aaaa)</span></th>
-          <th class="group">Ticket resto<br><span class="th-sub">Nbre — déblocage auto</span></th>
-          <th>Titre de transport</th>
-          <th>Forfait KMS</th>
-          <th>KMS PDT</th>
-          <th>Avantage nature</th>
-          <th>Acompte</th>
-          <th>Divers</th>
-          <th class="del"></th>
-        </tr>
-      </thead>
+      <thead id="thead"></thead>
       <tbody id="tbody"></tbody>
     </table>
     </div>
@@ -378,24 +390,47 @@
 <script>
 "use strict";
 
-// ---- Column model (structure Vendenheim, appliquée aux deux agences) ----
-const COLS = [
-  { key: "nom",       type: "name" },
-  { key: "embauche",  type: "text" },
-  { key: "contrat",   type: "text" },
-  { key: "avenant",     type: "text" },
-  { key: "avenantDate", type: "text" },
-  { key: "trNbre",      type: "ticket" },
-  { key: "titreTr",   type: "text" },
-  { key: "forfaitKm", type: "text" },
-  { key: "kmsPdt",    type: "text" },
-  { key: "avNature",  type: "text" },
-  { key: "acompte",   type: "text" },
-  { key: "divers",    type: "text" },
+// ---- Onglets & colonnes (les onglets partagent la même liste de salariés) ----
+// La colonne « Salarié » (nom) est toujours affichée en premier, la corbeille en dernier.
+const TABS = [
+  {
+    id: "prepaie", label: "Pré-paie",
+    cols: [
+      { key: "embauche",    label: "Date d'embauche" },
+      { key: "contrat",     label: "Contrat" },
+      { key: "avenant",     label: "Avenant",           sub: "nouveau contrat (h)" },
+      { key: "avenantDate", label: "Date de signature", sub: "de l'avenant (jj/mm/aaaa)" },
+      { key: "trNbre",      label: "Ticket resto",      sub: "Nbre — déblocage auto", type: "ticket" },
+      { key: "titreTr",     label: "Titre de transport" },
+      { key: "forfaitKm",   label: "Forfait KMS" },
+      { key: "kmsPdt",      label: "KMS PDT" },
+      { key: "avNature",    label: "Avantage nature" },
+      { key: "acompte",     label: "Acompte" },
+      { key: "divers",      label: "Divers" },
+    ],
+  },
+  {
+    id: "heures", label: "Heures réalisées",
+    cols: [
+      { key: "contrat",   label: "Contrat" },
+      { key: "realisees", label: "Heures réalisées" },
+      { key: "heuresObs", label: "Observations", wide: true },
+    ],
+  },
+  {
+    id: "pertes", label: "Pertes / Dispenses",
+    cols: [
+      { key: "pertesDispense", label: "Perte de mission / Dispense d'intervention", wide: true },
+      { key: "pertesDate",     label: "Date" },
+      { key: "pertesObs",      label: "Divers", wide: true },
+    ],
+  },
 ];
-const HEADERS = ["Salarié","Date d'embauche","Contrat","Avenant","Date de signature",
-  "Ticket resto (Nbre)","Titre de transport","Forfait KMS","KMS PDT",
-  "Avantage nature","Acompte","Divers"];
+function curTabDef() { return TABS.find(t => t.id === curTab) || TABS[0]; }
+// colonnes réellement rendues : Salarié + colonnes de l'onglet
+function tabColumns() {
+  return [{ key: "nom", type: "name", label: "Salarié" }].concat(curTabDef().cols);
+}
 
 // cycle des couleurs au double-clic (couleurs AID'AUX)
 const HL = ["", "hl-teal", "hl-orange", "hl-navy"];
@@ -465,6 +500,7 @@ const STORE_KEY = "aidaux_prepaie_v1";
 let store = loadStore();
 let curAgence = "vendenheim";
 let curMois = MOIS[0];
+let curTab = "prepaie";
 
 function loadStore() {
   try {
@@ -477,9 +513,13 @@ function saveStore() {
   try { localStorage.setItem(STORE_KEY, JSON.stringify(store)); } catch (e) {}
 }
 
+// toutes les clés utilisées, tous onglets confondus
+const ALL_KEYS = ["nom"].concat(
+  TABS.reduce((a, t) => a.concat(t.cols.map(c => c.key)), [])
+);
 function emptyRow(seed) {
   const r = {};
-  COLS.forEach(c => r[c.key] = "");
+  ALL_KEYS.forEach(k => r[k] = "");
   r._hl = {};
   if (seed) { r.nom = seed[0]||""; r.embauche = seed[1]||""; r.contrat = seed[2]||""; }
   return r;
@@ -544,7 +584,34 @@ function ticketDebloque(embauche, mois) {
 }
 
 // ---- Rendering ----
+function renderHead(cols) {
+  const thead = document.getElementById("thead");
+  thead.innerHTML = "";
+  const tr = document.createElement("tr");
+  const thNum = document.createElement("th");
+  thNum.className = "rownum"; thNum.textContent = "#";
+  tr.appendChild(thNum);
+  cols.forEach(col => {
+    const th = document.createElement("th");
+    if (col.type === "name") th.className = "hname";
+    if (col.type === "ticket") th.className = "group";
+    th.innerHTML = col.label + (col.sub ? '<br><span class="th-sub">' + col.sub + '</span>' : "");
+    tr.appendChild(th);
+  });
+  const thDel = document.createElement("th");
+  thDel.className = "del";
+  tr.appendChild(thDel);
+  thead.appendChild(tr);
+}
+
 function render() {
+  const cols = tabColumns();
+  renderHead(cols);
+
+  // la légende Ticket resto n'a de sens que dans l'onglet Pré-paie
+  document.getElementById("legend").style.display =
+    (curTab === "prepaie") ? "" : "none";
+
   const tbody = document.getElementById("tbody");
   tbody.innerHTML = "";
   const rows = getSheet(curAgence, curMois);
@@ -558,9 +625,10 @@ function render() {
     num.textContent = ri + 1;
     tr.appendChild(num);
 
-    COLS.forEach(col => {
+    cols.forEach(col => {
       const td = document.createElement("td");
       if (col.type === "name") td.className = "name";
+      if (col.wide) td.classList.add("wide");
       // La case Ticket resto n'accepte que le marquage « ne bénéficie pas » ;
       // on nettoie tout autre marquage (anciennes couleurs) resté coincé.
       if (col.type === "ticket" && row._hl[col.key]
@@ -662,22 +730,36 @@ function addRow() {
 
 function exportCsv() {
   const rows = getSheet(curAgence, curMois);
+  const cols = tabColumns();
   const sep = ";";
   const esc = v => '"' + String(v == null ? "" : v).replace(/"/g, '""') + '"';
-  const lines = [HEADERS.map(esc).join(sep)];
+  const lines = [cols.map(c => esc(c.label)).join(sep)];
   rows.forEach(r => {
-    lines.push(COLS.map(c => esc(r[c.key])).join(sep));
+    lines.push(cols.map(c => esc(r[c.key])).join(sep));
   });
   const csv = "﻿" + lines.join("\r\n");
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "prepaie_" + AGENCES[curAgence].nom + "_" + curMois.replace(/\s+/g, "_") + ".csv";
+  a.download = "prepaie_" + curTab + "_" + AGENCES[curAgence].nom
+    + "_" + curMois.replace(/\s+/g, "_") + ".csv";
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+function renderTabs() {
+  const bar = document.getElementById("tabs");
+  bar.innerHTML = "";
+  TABS.forEach(t => {
+    const b = document.createElement("div");
+    b.className = "tab" + (t.id === curTab ? " active" : "");
+    b.textContent = t.label;
+    b.addEventListener("click", () => { curTab = t.id; renderTabs(); render(); });
+    bar.appendChild(b);
+  });
 }
 
 // ---- Init controls ----
@@ -707,6 +789,7 @@ function initControls() {
 }
 
 initControls();
+renderTabs();
 render();
 </script>
 </body>
