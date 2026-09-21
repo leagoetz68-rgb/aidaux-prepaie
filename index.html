@@ -249,6 +249,8 @@
   td.hl-yellow input { background: var(--yellow); border-radius: 6px; font-weight: 600; }
   td.hl-red input { background: var(--red); color: #fff; font-weight: 700; border-radius: 6px; }
   td.hl-black input { background: #1f2530; color: #fff; font-weight: 700; border-radius: 6px; }
+  /* un champ désactivé ne doit pas bloquer le double-clic sur la cellule */
+  tbody input:disabled { pointer-events: none; }
   td.hl-red input::placeholder, td.hl-black input::placeholder { color:#fff; opacity:.95; font-weight:700; }
   td.hl-grey { background: repeating-linear-gradient(45deg,#aab4bc,#aab4bc 6px,#9ba6ae 6px,#9ba6ae 12px); }
 
