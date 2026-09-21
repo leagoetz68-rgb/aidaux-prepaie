@@ -545,8 +545,18 @@ function render() {
     COLS.forEach(col => {
       const td = document.createElement("td");
       if (col.type === "name") td.className = "name";
+      // La case Ticket resto n'accepte que rouge/noir ; on nettoie tout autre
+      // marquage (jaune/gris) resté coincé.
+      if (col.type === "ticket" && row._hl[col.key]
+          && row._hl[col.key] !== "hl-red" && row._hl[col.key] !== "hl-black") {
+        row._hl[col.key] = "";
+        saveStore();
+      }
       const hl = row._hl[col.key];
       if (hl) td.classList.add(hl);
+
+      // cycle de couleurs propre à chaque type de colonne
+      const cycle = (col.type === "ticket") ? ["", "hl-red", "hl-black"] : HL;
 
       const inp = document.createElement("input");
       inp.type = "text";
@@ -556,7 +566,8 @@ function render() {
       td.addEventListener("dblclick", (e) => {
         if (col.type === "name") return;
         const cur = row._hl[col.key] || "";
-        const next = HL[(HL.indexOf(cur) + 1) % HL.length];
+        const idx = cycle.indexOf(cur);
+        const next = cycle[((idx < 0 ? 0 : idx) + 1) % cycle.length];
         HL.forEach(h => h && td.classList.remove(h));
         if (next) td.classList.add(next);
         row._hl[col.key] = next;
