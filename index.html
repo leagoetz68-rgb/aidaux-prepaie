@@ -258,21 +258,14 @@
 
   /* Ticket resto : déblocage auto */
   .th-sub { display:block; font-size:.62rem; font-weight:600; color:var(--teal-dark); margin-top:2px; }
-  td.tr-lock {
-    position: relative;
-    background: #f2f5f8;
-  }
-  td.tr-lock::after {
-    content: "";
-    position: absolute; inset: 0;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='15' height='15' viewBox='0 0 24 24' fill='none' stroke='%23aeb8c4' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='11' width='18' height='11' rx='2'/%3E%3Cpath d='M7 11V7a5 5 0 0 1 10 0v4'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: center;
-    pointer-events: none;
-    opacity: .8;
-  }
+  td.tr-lock { background: #f6f8fa; }
   td.tr-lock input { cursor: not-allowed; color: transparent; }
-  td.tr-lock input::placeholder { color: transparent; }
+  td.tr-lock input::placeholder {
+    color: #9aa6b2;
+    font-style: italic;
+    font-size: .78rem;
+    opacity: 1;
+  }
   td.tr-ok { background: #e6f7f6; }
   td.tr-ok input { color: var(--teal-dark); font-weight:600; }
 
@@ -345,7 +338,7 @@
     </div>
 
     <div class="legend">
-      <span><i class="swatch" style="background:#dfe4ea"></i> 🔒 Ticket resto verrouillé (période d'essai)</span>
+      <span><i class="swatch" style="background:#f0f3f6"></i> « dès MM/AA » = ouverture après la période d'essai</span>
       <span class="hint">Ticket resto : déblocage auto après 2 mois d'essai. Double-cliquez la case pour la marquer « NON » (ne bénéficie pas).</span>
     </div>
 
@@ -532,6 +525,12 @@ function eligLabel(embauche) {
   const y = Math.floor(idx / 12), m = idx % 12;
   return "01/" + String(m + 1).padStart(2, "0") + "/" + y;
 }
+function eligShort(embauche) { // "08/26"
+  const idx = eligIndex(embauche);
+  if (idx == null) return "";
+  const y = Math.floor(idx / 12), m = idx % 12;
+  return String(m + 1).padStart(2, "0") + "/" + String(y).slice(-2);
+}
 // true si, pour le mois affiché, le salarié a droit aux tickets resto
 function ticketDebloque(embauche, mois) {
   const e = eligIndex(embauche);
@@ -604,9 +603,8 @@ function render() {
           td.classList.add("tr-lock");
           inp.disabled = true;
           inp.value = "";
-          inp.placeholder = "";
-          const from = eligLabel(row.embauche);
-          td.title = "Titres restaurant à partir du " + from
+          inp.placeholder = "dès " + eligShort(row.embauche);
+          td.title = "Titres restaurant à partir du " + eligLabel(row.embauche)
             + " (fin de période d'essai)";
         }
       }
