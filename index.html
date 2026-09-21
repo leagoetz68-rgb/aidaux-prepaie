@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AID'AUX — Pré-paie</title>
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<style>
+  :root {
+    --teal: #00BBB4;
+    --teal-dark: #000F9F;
+    --orange: #FF4713;
+    --bg: #f4f7f7;
+    --card: #ffffff;
+    --text: #223;
+    --muted: #6b7a7a;
+    --border: #dfe7e6;
+    --head: #d7e8e2;
+    --yellow: #fff23f;
+    --red: #e53935;
+    --grey: #9aa4a4;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Segoe UI", Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+  .topbar {
+    background: #fff;
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    border-bottom: 3px solid var(--orange);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+  .topbar img { height: 44px; }
+  .topbar h1 {
+    color: var(--teal-dark);
+    font-size: 1.2rem;
+    margin: 0;
+  }
+  .topbar a.back {
+    margin-left: auto;
+    color: var(--teal-dark);
+    text-decoration: none;
+    font-size: 0.9rem;
+    font-weight: 600;
+    border: 1px solid var(--border);
+    padding: 7px 14px;
+    border-radius: 6px;
+  }
+  .topbar a.back:hover { background: var(--bg); }
+
+  .toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: flex-end;
+    padding: 18px 24px 8px;
+  }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field label {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--muted);
+    font-weight: 600;
+  }
+  select, .toolbar input[type=text] {
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.92rem;
+    background: #fff;
+    min-width: 160px;
+  }
+  .btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    color: #fff;
+    background: var(--orange);
+  }
+  .btn:hover { background: #d93a0f; }
+  .btn.secondary { background: var(--teal-dark); }
+  .btn.secondary:hover { background: #000b6e; }
+  .btn.ghost { background: #fff; color: var(--teal-dark); border: 1px solid var(--border); }
+  .btn.ghost:hover { background: var(--bg); }
+  .spacer { flex: 1; }
+
+  .meta {
+    padding: 0 24px;
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+
+  .table-wrap {
+    margin: 12px 24px 40px;
+    overflow-x: auto;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+  }
+  table { border-collapse: collapse; width: 100%; font-size: 0.82rem; }
+  thead th {
+    background: var(--head);
+    color: #1a3a34;
+    font-weight: 700;
+    padding: 8px 6px;
+    border: 1px solid #c3d6cf;
+    text-align: center;
+    position: sticky;
+    top: 0;
+    white-space: nowrap;
+  }
+  thead tr.sub th { background: #c9ddd6; font-size: 0.74rem; font-weight: 600; }
+  tbody td {
+    border: 1px solid var(--border);
+    padding: 0;
+    text-align: center;
+    vertical-align: middle;
+  }
+  tbody td.name {
+    text-align: left;
+    font-weight: 600;
+    white-space: nowrap;
+    padding: 0 6px;
+    background: #fafcfb;
+  }
+  tbody tr:nth-child(even) td.name { background: #f2f7f5; }
+  tbody input {
+    width: 100%;
+    border: none;
+    background: transparent;
+    padding: 6px 5px;
+    font: inherit;
+    text-align: center;
+    min-width: 68px;
+  }
+  tbody td.name input { text-align: left; font-weight: 600; min-width: 150px; }
+  tbody input:focus { outline: 2px solid var(--teal); outline-offset: -2px; background: #fff; }
+  td.hl-yellow input { background: var(--yellow); }
+  td.hl-red input { background: var(--red); color: #fff; font-weight: 700; }
+  td.hl-grey { background: var(--grey); }
+  td.rownum {
+    background: #eef4f2;
+    color: var(--muted);
+    font-size: 0.7rem;
+    width: 26px;
+    padding: 0 2px;
+  }
+  td.del { width: 30px; }
+  td.del button {
+    border: none;
+    background: transparent;
+    color: var(--red);
+    cursor: pointer;
+    font-size: 1rem;
+    line-height: 1;
+    padding: 4px 6px;
+  }
+  td.del button:hover { color: #a00; }
+
+  .row-actions { padding: 0 24px 40px; }
+
+  .legend {
+    padding: 4px 24px 0;
+    display: flex;
+    gap: 18px;
+    flex-wrap: wrap;
+    font-size: 0.75rem;
+    color: var(--muted);
+    align-items: center;
+  }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid #0002; display: inline-block; }
+
+  @media print {
+    .topbar a.back, .toolbar, .row-actions, td.del, .legend .hint { display: none !important; }
+    .table-wrap { box-shadow: none; border: none; margin: 0; }
+    body { background: #fff; }
+  }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <img src="logo.png" alt="AID'AUX">
+    <h1>Pré-paie</h1>
+    <a class="back" href="https://aidaux-portail.vercel.app">← Portail</a>
+  </div>
+
+  <div class="toolbar">
+    <div class="field">
+      <label for="agence">Agence</label>
+      <select id="agence"></select>
+    </div>
+    <div class="field">
+      <label for="mois">Mois</label>
+      <select id="mois"></select>
+    </div>
+    <div class="spacer"></div>
+    <button class="btn" id="addRow">+ Salarié</button>
+    <button class="btn secondary" id="exportCsv">Export CSV</button>
+    <button class="btn ghost" id="printBtn">Imprimer</button>
+  </div>
+
+  <div class="legend">
+    <span><i class="swatch" style="background:#fff23f"></i> Date à surveiller</span>
+    <span><i class="swatch" style="background:#e53935"></i> Absence / alerte</span>
+    <span><i class="swatch" style="background:#9aa4a4"></i> Sans objet</span>
+    <span class="hint" style="margin-left:auto">Astuce : double-cliquez sur une cellule pour changer sa couleur.</span>
+  </div>
+
+  <div class="meta" id="meta"></div>
+
+  <div class="table-wrap">
+    <table id="grid">
+      <thead>
+        <tr>
+          <th rowspan="2" class="rownum">#</th>
+          <th rowspan="2">Salarié</th>
+          <th rowspan="2">Date d'embauche</th>
+          <th rowspan="2">Contrat</th>
+          <th rowspan="2">Avenant M-1</th>
+          <th rowspan="2">Avenant</th>
+          <th colspan="2">Ticket resto</th>
+          <th rowspan="2">Titre de transport</th>
+          <th rowspan="2">Forfait KMS</th>
+          <th rowspan="2">KMS PDT</th>
+          <th rowspan="2">Avantage nature</th>
+          <th rowspan="2">Acompte</th>
+          <th rowspan="2">Divers</th>
+          <th rowspan="2" class="del"></th>
+        </tr>
+        <tr class="sub">
+          <th>Date ok</th>
+          <th>Nbre</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+
+  <div class="row-actions">
+    <button class="btn ghost" id="addRow2">+ Ajouter un salarié</button>
+  </div>
+
+<script>
+"use strict";
+
+// ---- Column model (structure Vendenheim, appliquée aux deux agences) ----
+const COLS = [
+  { key: "nom",       type: "name" },
+  { key: "embauche",  type: "text" },
+  { key: "contrat",   type: "text" },
+  { key: "avenantM1", type: "text" },
+  { key: "avenant",   type: "text" },
+  { key: "trDate",    type: "text" },
+  { key: "trNbre",    type: "text" },
+  { key: "titreTr",   type: "text" },
+  { key: "forfaitKm", type: "text" },
+  { key: "kmsPdt",    type: "text" },
+  { key: "avNature",  type: "text" },
+  { key: "acompte",   type: "text" },
+  { key: "divers",    type: "text" },
+];
+const HEADERS = ["Salarié","Date d'embauche","Contrat","Avenant M-1","Avenant",
+  "TR Date ok","TR Nbre","Titre de transport","Forfait KMS","KMS PDT",
+  "Avantage nature","Acompte","Divers"];
+
+// cycle des couleurs au double-clic
+const HL = ["", "hl-yellow", "hl-red", "hl-grey"];
+
+// ---- Agences & effectifs de départ ----
+const AGENCES = {
+  vendenheim: {
+    nom: "Vendenheim",
+    salaries: [
+      ["ABOUDA Habiba","01/03/2026","104"],
+      ["BILOMBA Séraphine","12/12/2025","151,67"],
+      ["BORAS Ouassila","19/05/2025","40"],
+      ["CAVILLIER Lova","05/08/2026","8,67"],
+      ["CHATILLON Aurélie","12/06/2025","151,67"],
+      ["DEL MINCHONI Victor","01/08/2026","40"],
+      ["ERDOGAN Gulizar","24/03/2026","8,67"],
+      ["GRIESBACH Muriel","11/07/2025","85"],
+      ["HOUSSEIN WABERI Kadra","21/04/2026","8,67"],
+      ["KALT Coralyne","19/05/2026","8,67"],
+      ["KONDZIELA Cassandra","19/01/2026","8,67"],
+      ["MATT Claudia","09/02/2026","8,67"],
+      ["NEUBURGER Laura","03/11/2025","40"],
+      ["ONIMUS Claire","04/08/2026","8,67"],
+      ["RAUSER Sony","06/03/2026","151,67"],
+      ["RINK Aurélie","03/02/2026","8,67"],
+      ["TEKIN Dilek","13/12/2025","8,67"],
+      ["WEBER Angèle","01/06/2026","8,67"],
+      ["WELSCH Andréia","01/07/2026","8,67"],
+    ],
+  },
+  cronenbourg: {
+    nom: "Cronenbourg",
+    salaries: [
+      ["Acker Tatiana","","151,67"],["Akhonzada Abduljabar","","104"],["Amiri Saiedeh","","104"],
+      ["Bakemba Prisca","","120"],["Blanchet Yoann","","151,67"],["Bonnet Solange","","26"],
+      ["Bouzagloui Nadia","","15"],["Broladze Mariami","","104"],["Cadoni Laura","","150,4"],
+      ["Deutsch Maëva","","115"],["Diaboungana, Sylvie","","65"],["Diadhiou Chantal","","130"],
+      ["Diallo Djeinabou","","151,67"],["Dietrich, Aurore","","130"],["Dingeldein, Prescilla","","80"],
+      ["Dix Annie","","151,67"],["Donati Anastasia","","60"],["Duchene Monique","","120"],
+      ["El Aydi Asmae","","70"],["Fischer Léa","","151,67"],["Gauthier, Lucie","","151,67"],
+      ["Glaess Rajaa","","151,67"],["Hend Ibtissem","","100"],["Hohnadel Déborah","","80"],
+      ["Junieres Laure","","104"],["Kamiza Tamatafika","","130"],["Khedir, Khadija","","50"],
+      ["Kokhtashvili Ekaterine","","104"],["Kurilko Tetiana","","104"],["Le Guen Laura","","130"],
+      ["Leonhart Kalina","","105"],["Mansoor Sodaba","","104"],["Marlier Sandra","","130"],
+      ["Maurice Alain","","151,67"],["Mayetela Evelyne","","50"],["Mugisha Yannick","","120"],
+      ["Naman Omar","","104"],["Neyra-Prado, Rosa","","151,67"],["Nivet, Sylvie","","110"],
+      ["Njezi Linda","","100"],["Nohovitsyna Irina","","120"],["Nsabimana Gérard","","151,67"],
+      ["Pain John","","151,67"],["Papikyan Anna","","85"],["Pfister Prescilla","","80"],
+      ["Rohrbacher Jennifer","","115"],["Rosca Eléna","","110"],["Saddouki Saliha","","30"],
+      ["Seewald Jean-Jacques","","151,67"],["Smoki Nadia","","100"],["Smolarczuk Izabela","","140"],
+      ["Tchouate Tankoua Prisca","","151,67"],["Ture Fatou","","130"],["Zarcos Jessica","","30"],
+    ],
+  },
+};
+
+// ---- Mois disponibles ----
+const MOIS = [
+  "Septembre 2026","Août 2026","Juillet 2026","Juin 2026","Mai 2026","Avril 2026",
+  "Mars 2026","Février 2026","Janvier 2026","Décembre 2025","Novembre 2025",
+  "Octobre 2025","Septembre 2025","Août 2025","Juillet 2025","Juin 2025"
+];
+
+const STORE_KEY = "aidaux_prepaie_v1";
+
+// ---- State ----
+let store = loadStore();
+let curAgence = "vendenheim";
+let curMois = MOIS[0];
+
+function loadStore() {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch (e) {}
+  return {};
+}
+function saveStore() {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(store)); } catch (e) {}
+}
+
+function emptyRow(seed) {
+  const r = {};
+  COLS.forEach(c => r[c.key] = "");
+  r._hl = {};
+  if (seed) { r.nom = seed[0]||""; r.embauche = seed[1]||""; r.contrat = seed[2]||""; }
+  return r;
+}
+
+function getSheet(agence, mois) {
+  store[agence] = store[agence] || {};
+  if (!store[agence][mois]) {
+    // seed from the agency roster the first time a sheet is opened
+    store[agence][mois] = AGENCES[agence].salaries.map(s => emptyRow(s));
+    saveStore();
+  }
+  return store[agence][mois];
+}
+
+// ---- Rendering ----
+function render() {
+  const tbody = document.getElementById("tbody");
+  tbody.innerHTML = "";
+  const rows = getSheet(curAgence, curMois);
+
+  rows.forEach((row, ri) => {
+    if (!row._hl) row._hl = {};
+    const tr = document.createElement("tr");
+
+    const num = document.createElement("td");
+    num.className = "rownum";
+    num.textContent = ri + 1;
+    tr.appendChild(num);
+
+    COLS.forEach(col => {
+      const td = document.createElement("td");
+      if (col.type === "name") td.className = "name";
+      const hl = row._hl[col.key];
+      if (hl) td.classList.add(hl);
+
+      const inp = document.createElement("input");
+      inp.type = "text";
+      inp.value = row[col.key] || "";
+      inp.addEventListener("input", () => { row[col.key] = inp.value; saveStore(); });
+      // double-clic = change la couleur de fond de la cellule
+      td.addEventListener("dblclick", (e) => {
+        if (col.type === "name") return;
+        const cur = row._hl[col.key] || "";
+        const next = HL[(HL.indexOf(cur) + 1) % HL.length];
+        HL.forEach(h => h && td.classList.remove(h));
+        if (next) td.classList.add(next);
+        row._hl[col.key] = next;
+        saveStore();
+      });
+      td.appendChild(inp);
+      tr.appendChild(td);
+    });
+
+    const del = document.createElement("td");
+    del.className = "del";
+    const btn = document.createElement("button");
+    btn.textContent = "✕";
+    btn.title = "Supprimer ce salarié";
+    btn.addEventListener("click", () => {
+      if (confirm("Supprimer « " + (row.nom || "cette ligne") + " » ?")) {
+        rows.splice(ri, 1);
+        saveStore();
+        render();
+      }
+    });
+    del.appendChild(btn);
+    tr.appendChild(del);
+
+    tbody.appendChild(tr);
+  });
+
+  document.getElementById("meta").textContent =
+    AGENCES[curAgence].nom + " — " + curMois + " · " + rows.length + " salarié(s)";
+}
+
+function addRow() {
+  const rows = getSheet(curAgence, curMois);
+  rows.push(emptyRow(null));
+  saveStore();
+  render();
+  // focus le nom de la nouvelle ligne
+  const inputs = document.querySelectorAll("#tbody tr:last-child input");
+  if (inputs[0]) inputs[0].focus();
+}
+
+function exportCsv() {
+  const rows = getSheet(curAgence, curMois);
+  const sep = ";";
+  const esc = v => '"' + String(v == null ? "" : v).replace(/"/g, '""') + '"';
+  const lines = [HEADERS.map(esc).join(sep)];
+  rows.forEach(r => {
+    lines.push(COLS.map(c => esc(r[c.key])).join(sep));
+  });
+  const csv = "﻿" + lines.join("\r\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "prepaie_" + AGENCES[curAgence].nom + "_" + curMois.replace(/\s+/g, "_") + ".csv";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ---- Init controls ----
+function initControls() {
+  const selA = document.getElementById("agence");
+  Object.keys(AGENCES).forEach(k => {
+    const o = document.createElement("option");
+    o.value = k; o.textContent = AGENCES[k].nom;
+    selA.appendChild(o);
+  });
+  selA.value = curAgence;
+  selA.addEventListener("change", () => { curAgence = selA.value; render(); });
+
+  const selM = document.getElementById("mois");
+  MOIS.forEach(m => {
+    const o = document.createElement("option");
+    o.value = m; o.textContent = m;
+    selM.appendChild(o);
+  });
+  selM.value = curMois;
+  selM.addEventListener("change", () => { curMois = selM.value; render(); });
+
+  document.getElementById("addRow").addEventListener("click", addRow);
+  document.getElementById("addRow2").addEventListener("click", addRow);
+  document.getElementById("exportCsv").addEventListener("click", exportCsv);
+  document.getElementById("printBtn").addEventListener("click", () => window.print());
+}
+
+initControls();
+render();
+</script>
+</body>
+</html>
