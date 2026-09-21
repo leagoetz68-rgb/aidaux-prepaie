@@ -250,6 +250,16 @@
   td.hl-red input { background: var(--red); color: #fff; font-weight: 700; border-radius: 6px; }
   td.hl-grey { background: repeating-linear-gradient(45deg,#aab4bc,#aab4bc 6px,#9ba6ae 6px,#9ba6ae 12px); }
 
+  /* Ticket resto : déblocage auto */
+  .th-sub { display:block; font-size:.62rem; font-weight:600; color:#5b6bb0; margin-top:2px; }
+  td.tr-lock {
+    background: repeating-linear-gradient(45deg,#e9edf1,#e9edf1 7px,#dfe4ea 7px,#dfe4ea 14px);
+  }
+  td.tr-lock input { cursor: not-allowed; color: #97a1ab; }
+  td.tr-lock input::placeholder { color:#9aa4ae; opacity:1; }
+  td.tr-ok { background: #eafaf6; }
+  td.tr-ok input { color:#0a7d54; font-weight:600; }
+
   td.rownum {
     background: #f0f5f7;
     color: var(--muted);
@@ -324,31 +334,28 @@
       <span><i class="swatch" style="background:#ffe14d"></i> Date à surveiller</span>
       <span><i class="swatch" style="background:#e53935"></i> Absence / alerte</span>
       <span><i class="swatch" style="background:#aab4bc"></i> Sans objet</span>
-      <span class="hint">Astuce : double-cliquez sur une cellule pour changer sa couleur.</span>
+      <span><i class="swatch" style="background:#dfe4ea"></i> 🔒 Ticket resto verrouillé (période d'essai)</span>
+      <span class="hint">Le ticket resto se débloque après 2 mois d'essai, le mois suivant. Double-cliquez sur une cellule pour changer sa couleur.</span>
     </div>
 
     <div class="table-wrap">
     <table id="grid">
       <thead>
         <tr>
-          <th rowspan="2" class="rownum">#</th>
-          <th rowspan="2" class="hname">Salarié</th>
-          <th rowspan="2">Date d'embauche</th>
-          <th rowspan="2">Contrat</th>
-          <th rowspan="2">Avenant M-1</th>
-          <th rowspan="2">Avenant</th>
-          <th colspan="2" class="group">Ticket resto</th>
-          <th rowspan="2">Titre de transport</th>
-          <th rowspan="2">Forfait KMS</th>
-          <th rowspan="2">KMS PDT</th>
-          <th rowspan="2">Avantage nature</th>
-          <th rowspan="2">Acompte</th>
-          <th rowspan="2">Divers</th>
-          <th rowspan="2" class="del"></th>
-        </tr>
-        <tr class="sub">
-          <th>Date ok</th>
-          <th>Nbre</th>
+          <th class="rownum">#</th>
+          <th class="hname">Salarié</th>
+          <th>Date d'embauche</th>
+          <th>Contrat</th>
+          <th>Avenant M-1</th>
+          <th>Avenant</th>
+          <th class="group">Ticket resto<br><span class="th-sub">Nbre — déblocage auto</span></th>
+          <th>Titre de transport</th>
+          <th>Forfait KMS</th>
+          <th>KMS PDT</th>
+          <th>Avantage nature</th>
+          <th>Acompte</th>
+          <th>Divers</th>
+          <th class="del"></th>
         </tr>
       </thead>
       <tbody id="tbody"></tbody>
@@ -370,8 +377,7 @@ const COLS = [
   { key: "contrat",   type: "text" },
   { key: "avenantM1", type: "text" },
   { key: "avenant",   type: "text" },
-  { key: "trDate",    type: "text" },
-  { key: "trNbre",    type: "text" },
+  { key: "trNbre",    type: "ticket" },
   { key: "titreTr",   type: "text" },
   { key: "forfaitKm", type: "text" },
   { key: "kmsPdt",    type: "text" },
@@ -380,7 +386,7 @@ const COLS = [
   { key: "divers",    type: "text" },
 ];
 const HEADERS = ["Salarié","Date d'embauche","Contrat","Avenant M-1","Avenant",
-  "TR Date ok","TR Nbre","Titre de transport","Forfait KMS","KMS PDT",
+  "Ticket resto (Nbre)","Titre de transport","Forfait KMS","KMS PDT",
   "Avantage nature","Acompte","Divers"];
 
 // cycle des couleurs au double-clic
@@ -480,6 +486,48 @@ function getSheet(agence, mois) {
   return store[agence][mois];
 }
 
+// ---- Éligibilité Ticket resto ----
+// Règle : embauche + 2 mois (fin de période d'essai), puis le mois suivant.
+// Ex. embauche le 20/05 -> éligible à partir du 01/08.
+const FR_MONTHS = {
+  "janvier":0,"février":1,"fevrier":1,"mars":2,"avril":3,"mai":4,"juin":5,
+  "juillet":6,"août":7,"aout":7,"septembre":8,"octobre":9,"novembre":10,
+  "décembre":11,"decembre":11
+};
+const FR_MONTH_NAMES = ["janvier","février","mars","avril","mai","juin",
+  "juillet","août","septembre","octobre","novembre","décembre"];
+
+function parseDateFr(s) { // "jj/mm/aaaa" -> {y,m,d} ou null
+  const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec((s || "").trim());
+  if (!m) return null;
+  return { d: +m[1], m: +m[2] - 1, y: +m[3] };
+}
+function parseMois(s) { // "Août 2026" -> {y,m} ou null
+  const p = (s || "").toLowerCase().trim().split(/\s+/);
+  if (p.length < 2 || !(p[0] in FR_MONTHS)) return null;
+  return { m: FR_MONTHS[p[0]], y: parseInt(p[1], 10) };
+}
+// Renvoie le 1er mois d'éligibilité en index absolu (année*12+mois), ou null
+function eligIndex(embauche) {
+  const d = parseDateFr(embauche);
+  if (!d) return null;
+  // mois de début + 2 (fin d'essai) + 1 (mois suivant) = +3
+  return d.y * 12 + d.m + 3;
+}
+function eligLabel(embauche) {
+  const idx = eligIndex(embauche);
+  if (idx == null) return "";
+  const y = Math.floor(idx / 12), m = idx % 12;
+  return "01/" + String(m + 1).padStart(2, "0") + "/" + y;
+}
+// true si, pour le mois affiché, le salarié a droit aux tickets resto
+function ticketDebloque(embauche, mois) {
+  const e = eligIndex(embauche);
+  const mm = parseMois(mois);
+  if (e == null || !mm) return true; // pas de date -> on ne verrouille pas
+  return (mm.y * 12 + mm.m) >= e;
+}
+
 // ---- Rendering ----
 function render() {
   const tbody = document.getElementById("tbody");
@@ -515,6 +563,23 @@ function render() {
         row._hl[col.key] = next;
         saveStore();
       });
+
+      // Ticket resto : déblocage automatique après la période d'essai
+      if (col.type === "ticket") {
+        if (ticketDebloque(row.embauche, curMois)) {
+          td.classList.add("tr-ok");
+          inp.placeholder = "";
+        } else {
+          td.classList.add("tr-lock");
+          inp.disabled = true;
+          inp.value = "";
+          inp.placeholder = "🔒";
+          const from = eligLabel(row.embauche);
+          td.title = "Titres restaurant à partir du " + from
+            + " (fin de période d'essai)";
+        }
+      }
+
       td.appendChild(inp);
       tr.appendChild(td);
     });
