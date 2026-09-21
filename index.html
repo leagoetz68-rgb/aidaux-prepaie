@@ -354,8 +354,8 @@
           <th class="hname">Salarié</th>
           <th>Date d'embauche</th>
           <th>Contrat</th>
-          <th>Avenant M-1</th>
           <th>Avenant</th>
+          <th>Date de signature</th>
           <th class="group">Ticket resto<br><span class="th-sub">Nbre — déblocage auto</span></th>
           <th>Titre de transport</th>
           <th>Forfait KMS</th>
@@ -383,9 +383,9 @@ const COLS = [
   { key: "nom",       type: "name" },
   { key: "embauche",  type: "text" },
   { key: "contrat",   type: "text" },
-  { key: "avenantM1", type: "text" },
-  { key: "avenant",   type: "text" },
-  { key: "trNbre",    type: "ticket" },
+  { key: "avenant",     type: "text" },
+  { key: "avenantDate", type: "text" },
+  { key: "trNbre",      type: "ticket" },
   { key: "titreTr",   type: "text" },
   { key: "forfaitKm", type: "text" },
   { key: "kmsPdt",    type: "text" },
@@ -393,7 +393,7 @@ const COLS = [
   { key: "acompte",   type: "text" },
   { key: "divers",    type: "text" },
 ];
-const HEADERS = ["Salarié","Date d'embauche","Contrat","Avenant M-1","Avenant",
+const HEADERS = ["Salarié","Date d'embauche","Contrat","Avenant","Date de signature",
   "Ticket resto (Nbre)","Titre de transport","Forfait KMS","KMS PDT",
   "Avantage nature","Acompte","Divers"];
 
