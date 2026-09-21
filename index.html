@@ -259,12 +259,16 @@
   /* Ticket resto : déblocage auto */
   .th-sub { display:block; font-size:.62rem; font-weight:600; color:var(--teal-dark); margin-top:2px; }
   td.tr-lock { background: #f6f8fa; }
-  td.tr-lock input { cursor: not-allowed; color: transparent; }
-  td.tr-lock input::placeholder {
-    color: #9aa6b2;
-    font-style: italic;
-    font-size: .78rem;
-    opacity: 1;
+  .tr-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: #eef1fb;
+    border: 1px solid #d5daf3;
+    color: var(--navy);
+    font-size: .74rem;
+    font-weight: 700;
+    white-space: nowrap;
   }
   td.tr-ok { background: #e6f7f6; }
   td.tr-ok input { color: var(--teal-dark); font-weight:600; }
@@ -603,9 +607,21 @@ function render() {
           td.classList.add("tr-lock");
           inp.disabled = true;
           inp.value = "";
-          inp.placeholder = "dès " + eligShort(row.embauche);
+          inp.style.display = "none";
+          const idx2 = eligIndex(row.embauche);
+          const badge = document.createElement("span");
+          badge.className = "tr-badge";
+          if (idx2 != null) {
+            const y = Math.floor(idx2 / 12), m = idx2 % 12;
+            const nom = FR_MONTH_NAMES[m];
+            badge.textContent = "dès " + nom.charAt(0).toUpperCase() + nom.slice(1)
+              + " " + String(y).slice(-2);
+          } else {
+            badge.textContent = "—";
+          }
           td.title = "Titres restaurant à partir du " + eligLabel(row.embauche)
             + " (fin de période d'essai)";
+          td.appendChild(badge);
         }
       }
 
