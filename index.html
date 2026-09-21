@@ -248,6 +248,8 @@
   }
   td.hl-yellow input { background: var(--yellow); border-radius: 6px; font-weight: 600; }
   td.hl-red input { background: var(--red); color: #fff; font-weight: 700; border-radius: 6px; }
+  td.hl-black input { background: #1f2530; color: #fff; font-weight: 700; border-radius: 6px; }
+  td.hl-red input::placeholder, td.hl-black input::placeholder { color:#fff; opacity:.95; font-weight:700; }
   td.hl-grey { background: repeating-linear-gradient(45deg,#aab4bc,#aab4bc 6px,#9ba6ae 6px,#9ba6ae 12px); }
 
   /* Ticket resto : déblocage auto */
@@ -333,9 +335,10 @@
     <div class="legend">
       <span><i class="swatch" style="background:#ffe14d"></i> Date à surveiller</span>
       <span><i class="swatch" style="background:#e53935"></i> Absence / alerte</span>
+      <span><i class="swatch" style="background:#1f2530"></i> Ne bénéficie pas (rouge / noir)</span>
       <span><i class="swatch" style="background:#aab4bc"></i> Sans objet</span>
       <span><i class="swatch" style="background:#dfe4ea"></i> 🔒 Ticket resto verrouillé (période d'essai)</span>
-      <span class="hint">Le ticket resto se débloque après 2 mois d'essai, le mois suivant. Double-cliquez sur une cellule pour changer sa couleur.</span>
+      <span class="hint">Ticket resto : déblocage auto après 2 mois d'essai. Double-cliquez la case pour la marquer rouge/noir = « ne bénéficie pas ».</span>
     </div>
 
     <div class="table-wrap">
@@ -390,7 +393,7 @@ const HEADERS = ["Salarié","Date d'embauche","Contrat","Avenant M-1","Avenant",
   "Avantage nature","Acompte","Divers"];
 
 // cycle des couleurs au double-clic
-const HL = ["", "hl-yellow", "hl-red", "hl-grey"];
+const HL = ["", "hl-yellow", "hl-red", "hl-black", "hl-grey"];
 
 // ---- Agences & effectifs de départ ----
 const AGENCES = {
@@ -562,13 +565,21 @@ function render() {
         if (next) td.classList.add(next);
         row._hl[col.key] = next;
         saveStore();
+        if (col.type === "ticket") render(); // réapplique le statut de la case
       });
 
-      // Ticket resto : déblocage automatique après la période d'essai
+      // Ticket resto : couleur manuelle prioritaire, sinon déblocage auto
       if (col.type === "ticket") {
-        if (ticketDebloque(row.embauche, curMois)) {
+        if (hl) {
+          // Une couleur posée à la main = statut manuel (ex : ne bénéficie pas)
+          inp.disabled = true;
+          inp.value = "";
+          if (hl === "hl-red" || hl === "hl-black") {
+            inp.placeholder = "NON";
+            td.title = "Ne bénéficie pas des titres restaurant";
+          }
+        } else if (ticketDebloque(row.embauche, curMois)) {
           td.classList.add("tr-ok");
-          inp.placeholder = "";
         } else {
           td.classList.add("tr-lock");
           inp.disabled = true;
