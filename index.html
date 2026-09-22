@@ -264,28 +264,6 @@
     min-width: 74px;
     color: var(--text);
   }
-  tbody textarea {
-    width: 100%;
-    display: block;
-    border: none;
-    background: transparent;
-    padding: 9px 6px;
-    font: inherit;
-    text-align: left;
-    min-width: 74px;
-    color: var(--text);
-    resize: none;
-    overflow: hidden;
-    white-space: pre-wrap;
-    word-break: break-word;
-    line-height: 1.35;
-  }
-  tbody textarea:focus {
-    outline: none;
-    box-shadow: inset 0 0 0 2px var(--teal);
-    background: #fff;
-    border-radius: 6px;
-  }
   tbody td.name input { text-align: left; font-weight: 600; min-width: 210px; color: var(--indigo); }
   thead th.hname { min-width: 222px; text-align: left; padding-left: 12px; }
   tbody td.wide input { text-align: left; min-width: 320px; }
@@ -428,7 +406,7 @@ const TABS = [
       { key: "kmsPdt",      label: "KMS PDT" },
       { key: "avNature",    label: "Avantage nature" },
       { key: "acompte",     label: "Acompte" },
-      { key: "divers",      label: "Divers", type: "textarea" },
+      { key: "divers",      label: "Divers", minWidth: 150 },
     ],
   },
   {
@@ -674,20 +652,11 @@ function render() {
       // cycle de couleurs propre à chaque type de colonne
       const cycle = (col.type === "ticket") ? ["", "hl-orange", "hl-navy"] : HL;
 
-      const inp = document.createElement(col.type === "textarea" ? "textarea" : "input");
-      if (col.type === "textarea") {
-        inp.rows = 1;
-        inp.addEventListener("input", () => {
-          row[col.key] = inp.value;
-          saveStore();
-          inp.style.height = "auto";
-          inp.style.height = inp.scrollHeight + "px";
-        });
-      } else {
-        inp.type = "text";
-        inp.addEventListener("input", () => { row[col.key] = inp.value; saveStore(); });
-      }
+      const inp = document.createElement("input");
+      inp.type = "text";
       inp.value = row[col.key] || "";
+      inp.addEventListener("input", () => { row[col.key] = inp.value; saveStore(); });
+      if (col.minWidth) inp.style.minWidth = col.minWidth + "px";
       // double-clic = change la couleur de fond de la cellule
       td.addEventListener("dblclick", (e) => {
         if (col.type === "name") return;
@@ -737,10 +706,6 @@ function render() {
 
       td.appendChild(inp);
       tr.appendChild(td);
-      if (col.type === "textarea") {
-        inp.style.height = "auto";
-        inp.style.height = inp.scrollHeight + "px";
-      }
     });
 
     const del = document.createElement("td");
