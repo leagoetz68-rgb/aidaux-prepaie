@@ -239,6 +239,11 @@
   tbody tr:hover td { background: #f6fbfc; }
   tbody tr:hover td.name { background: #eef8f7; }
 
+  /* ligne surlignée quand on saisit dans une de ses cases */
+  tbody tr.row-selected td {
+    box-shadow: inset 0 0 0 9999px rgba(255, 214, 0, 0.28);
+  }
+
   /* sticky first columns */
   td.rownum, th.rownum { position: sticky; left: 0; z-index: 2; }
   td.name, thead th.hname { position: sticky; left: 44px; z-index: 2; }
@@ -773,6 +778,20 @@ function renderTabs() {
   });
 }
 
+// ---- Surlignage de la ligne active (clic/saisie dans une case) ----
+function initRowHighlight() {
+  const grid = document.getElementById("grid");
+  grid.addEventListener("focusin", (e) => {
+    if (e.target.tagName !== "INPUT") return;
+    const tr = e.target.closest("tr");
+    if (!tr) return;
+    grid.querySelectorAll("tbody tr.row-selected").forEach(r => {
+      if (r !== tr) r.classList.remove("row-selected");
+    });
+    tr.classList.add("row-selected");
+  });
+}
+
 // ---- Init controls ----
 function initControls() {
   const selA = document.getElementById("agence");
@@ -800,6 +819,7 @@ function initControls() {
 }
 
 initControls();
+initRowHighlight();
 renderTabs();
 render();
 </script>
