@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AID'AUX — Pré-paie</title>
+<link rel="icon" type="image/x-icon" href="{{ url_for('favicon') }}">
+<style>
+  :root {
+    /* Palette AID'AUX : turquoise, bleu marine, orange + neutres */
+    --teal: #00BBB4;
+    --teal-dark: #0a8f88;
+    --navy: #000F9F;
+    --navy-deep: #0a1560;
+    --indigo: #000F9F;
+    --orange: #FF4713;
+    --bg: #eef2f5;
+    --card: #ffffff;
+    --text: #1f2a37;
+    --muted: #6b7a86;
+    --border: #e4ebef;
+    --border-strong: #d3dde3;
+    --shadow: 0 10px 30px rgba(0,15,159,0.08);
+    --shadow-sm: 0 2px 8px rgba(0,15,159,0.06);
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    font-family: "Inter", "Segoe UI", system-ui, Arial, sans-serif;
+    background:
+      radial-gradient(1100px 500px at 100% -10%, rgba(0,187,180,0.10), transparent 60%),
+      radial-gradient(900px 500px at -10% 0%, rgba(106,27,154,0.08), transparent 55%),
+      var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---- Header ---- */
+  .topbar {
+    background: linear-gradient(100deg, #0a1560 0%, #1a2aa0 55%, #00BBB4 140%);
+    color: #fff;
+    padding: 16px 28px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    box-shadow: var(--shadow-sm);
+  }
+  .brand { display: flex; align-items: center; gap: 14px; }
+  .brand .logo-badge {
+    width: 46px; height: 46px;
+    background: #fff; border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.18);
+  }
+  .brand .logo-badge img { height: 34px; display: block; }
+  .brand .titles h1 { font-size: 1.18rem; margin: 0; font-weight: 700; letter-spacing: .2px; }
+  .brand .titles p { margin: 2px 0 0; font-size: .8rem; color: rgba(255,255,255,.8); }
+  .topbar a.back {
+    margin-left: auto;
+    color: #fff;
+    text-decoration: none;
+    font-size: .88rem;
+    font-weight: 600;
+    border: 1px solid rgba(255,255,255,.35);
+    padding: 8px 16px;
+    border-radius: 999px;
+    transition: background .15s ease;
+    backdrop-filter: blur(4px);
+  }
+  .topbar a.back:hover { background: rgba(255,255,255,.15); }
+
+  .container { max-width: 1500px; margin: 0 auto; padding: 22px 24px 60px; }
+
+  /* ---- Toolbar card ---- */
+  .toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: center;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 16px 18px;
+    box-shadow: var(--shadow-sm);
+  }
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field label {
+    font-size: .68rem;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--muted);
+    font-weight: 700;
+  }
+  .select-wrap { position: relative; }
+  select {
+    appearance: none;
+    padding: 10px 38px 10px 14px;
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
+    font-size: .95rem;
+    font-weight: 600;
+    color: var(--indigo);
+    background: #fff;
+    min-width: 180px;
+    cursor: pointer;
+    transition: border-color .15s ease, box-shadow .15s ease;
+  }
+  select:hover { border-color: var(--teal); }
+  select:focus { outline: none; border-color: var(--teal); box-shadow: 0 0 0 3px rgba(0,187,180,.2); }
+  .select-wrap::after {
+    content: "▾";
+    position: absolute; right: 14px; top: 50%;
+    transform: translateY(-50%);
+    color: var(--muted); font-size: .8rem; pointer-events: none;
+  }
+  .spacer { flex: 1; }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 10px 18px;
+    border: none;
+    border-radius: 10px;
+    font-size: .9rem;
+    font-weight: 600;
+    cursor: pointer;
+    color: #fff;
+    background: var(--orange);
+    box-shadow: 0 4px 12px rgba(255,71,19,.28);
+    transition: transform .12s ease, box-shadow .12s ease, background .15s ease;
+  }
+  .btn:hover { background: #e8390c; transform: translateY(-1px); }
+  .btn:active { transform: translateY(0); }
+  .btn.secondary { background: var(--teal-dark); box-shadow: 0 4px 12px rgba(16,26,107,.25); }
+  .btn.secondary:hover { background: #000b6e; }
+  .btn.ghost {
+    background: #fff; color: var(--indigo);
+    border: 1px solid var(--border-strong); box-shadow: none;
+  }
+  .btn.ghost:hover { background: #f3f7f9; border-color: var(--teal); }
+
+  /* ---- Stat chips ---- */
+  .stats { display: flex; flex-wrap: wrap; gap: 12px; margin: 18px 0 6px; }
+  .chip {
+    display: flex; align-items: center; gap: 12px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 12px 16px;
+    box-shadow: var(--shadow-sm);
+    min-width: 150px;
+  }
+  .chip .ic {
+    width: 38px; height: 38px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.1rem; color: #fff; flex: none;
+  }
+  .chip .ic.a { background: linear-gradient(135deg,#00BBB4,#0a9a94); }
+  .chip .ic.b { background: linear-gradient(135deg,#FF4713,#e8390c); }
+  .chip .ic.c { background: linear-gradient(135deg,#000F9F,#0a1560); }
+  .chip .k { font-size: .68rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 700; }
+  .chip .v { font-size: 1.02rem; font-weight: 700; color: var(--indigo); line-height: 1.1; }
+
+  /* ---- Tabs ---- */
+  .tabs { display: flex; gap: 6px; margin: 20px 0 0; flex-wrap: wrap; }
+  .tab {
+    padding: 10px 18px;
+    border: 1px solid var(--border-strong);
+    border-bottom: none;
+    border-radius: 12px 12px 0 0;
+    background: #eef2f5;
+    color: var(--muted);
+    font-size: .9rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background .12s ease, color .12s ease;
+  }
+  .tab:hover { background: #e4eaef; color: var(--navy); }
+  .tab.active {
+    background: var(--card);
+    color: var(--navy);
+    box-shadow: 0 -2px 6px rgba(0,15,159,.06);
+    position: relative;
+  }
+  .tab.active::after {
+    content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px;
+    background: var(--teal); border-radius: 3px 3px 0 0;
+  }
+
+  /* ---- Legend ---- */
+  .legend {
+    display: flex; gap: 18px; flex-wrap: wrap;
+    font-size: .78rem; color: var(--muted);
+    align-items: center; margin: 12px 2px 14px;
+  }
+  .legend span { display: inline-flex; align-items: center; gap: 7px; }
+  .swatch { width: 15px; height: 15px; border-radius: 4px; border: 1px solid #0002; display: inline-block; }
+  .legend .hint { margin-left: auto; font-style: italic; }
+
+  /* ---- Table ---- */
+  .table-wrap {
+    overflow-x: auto;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    box-shadow: var(--shadow);
+  }
+  table { border-collapse: separate; border-spacing: 0; width: 100%; font-size: .84rem; }
+  thead th {
+    background: #f4f8fa;
+    color: var(--indigo);
+    font-weight: 700;
+    padding: 11px 8px;
+    border-bottom: 1px solid var(--border-strong);
+    border-right: 1px solid var(--border);
+    text-align: center;
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    white-space: nowrap;
+  }
+  thead tr.sub th {
+    background: #eaf1f4;
+    font-size: .74rem;
+    font-weight: 600;
+    color: #3b4a72;
+    top: 44px;
+  }
+  thead th.group { background: #e7eefc; color: #26348c; }
+
+  tbody td {
+    border-bottom: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+    padding: 0;
+    text-align: center;
+    vertical-align: middle;
+  }
+  tbody tr:hover td { background: #f6fbfc; }
+  tbody tr:hover td.name { background: #eef8f7; }
+
+  /* ligne surlignée quand on saisit dans une de ses cases */
+  tbody tr.row-selected td {
+    box-shadow: inset 0 0 0 9999px rgba(255, 214, 0, 0.28);
+  }
+
+  /* sticky first columns */
+  td.rownum, th.rownum { position: sticky; left: 0; z-index: 2; }
+  td.name, thead th.hname { position: sticky; left: 44px; z-index: 2; }
+  thead th.rownum, thead th.hname { z-index: 4; }
+
+  tbody td.name {
+    text-align: left;
+    font-weight: 600;
+    white-space: nowrap;
+    padding: 0 8px;
+    background: #fbfdfd;
+    box-shadow: 1px 0 0 var(--border);
+  }
+  tbody tr:nth-child(even) td.name { background: #f5f9f9; }
+
+  tbody input {
+    width: 100%;
+    border: none;
+    background: transparent;
+    padding: 9px 6px;
+    font: inherit;
+    text-align: center;
+    min-width: 74px;
+    color: var(--text);
+  }
+  tbody td.name input { text-align: left; font-weight: 600; min-width: 210px; color: var(--indigo); }
+  thead th.hname { min-width: 222px; text-align: left; padding-left: 12px; }
+  tbody td.wide input { text-align: left; min-width: 320px; }
+  tbody input:focus {
+    outline: none;
+    box-shadow: inset 0 0 0 2px var(--teal);
+    background: #fff;
+    border-radius: 6px;
+  }
+  /* surlignage aux couleurs AID'AUX */
+  td.hl-teal   input { background: var(--teal);   color:#fff; font-weight: 700; border-radius: 6px; }
+  td.hl-orange input { background: var(--orange); color:#fff; font-weight: 700; border-radius: 6px; }
+  td.hl-navy   input { background: var(--navy);   color:#fff; font-weight: 700; border-radius: 6px; }
+  /* un champ désactivé ne doit pas bloquer le double-clic sur la cellule */
+  tbody input:disabled { pointer-events: none; }
+  td.hl-teal input::placeholder,
+  td.hl-orange input::placeholder,
+  td.hl-navy input::placeholder { color:#fff; opacity:.95; font-weight:700; }
+
+  /* Ticket resto : déblocage auto */
+  .th-sub { display:block; font-size:.62rem; font-weight:600; color:var(--teal-dark); margin-top:2px; }
+  td.tr-lock { background: #f6f8fa; }
+  .tr-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: #eef1fb;
+    border: 1px solid #d5daf3;
+    color: var(--navy);
+    font-size: .74rem;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  td.tr-ok { background: #e6f7f6; }
+  td.tr-ok input { color: var(--teal-dark); font-weight:600; }
+
+  td.rownum {
+    background: #f0f5f7;
+    color: var(--muted);
+    font-size: .72rem;
+    font-weight: 600;
+    width: 44px;
+    text-align: center;
+    box-shadow: 1px 0 0 var(--border);
+  }
+  th.rownum { width: 44px; }
+
+  td.del { width: 42px; }
+  td.del button {
+    border: none;
+    background: transparent;
+    color: #c2c9d0;
+    cursor: pointer;
+    font-size: 1rem;
+    line-height: 1;
+    padding: 6px 8px;
+    border-radius: 8px;
+    transition: color .12s ease, background .12s ease;
+  }
+  td.del button:hover { color: var(--orange); background: #ffe9e2; }
+
+  .row-actions { margin-top: 16px; }
+
+  @media print {
+    .topbar a.back, .toolbar, .row-actions, td.del, .legend .hint, .stats { display: none !important; }
+    body { background: #fff; }
+    .container { padding: 0; max-width: none; }
+    .table-wrap { box-shadow: none; border: none; }
+    .topbar { background: #101a6b !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand">
+      <div class="logo-badge"><img src="{{ url_for('logo') }}" alt="AID'AUX"></div>
+      <div class="titles">
+        <h1>Aid'Aux Pré-paie</h1>
+        <p>Éléments variables de paie — par agence & par mois</p>
+      </div>
+    </div>
+    <span style="margin-left:auto; font-size:.82rem; color:rgba(255,255,255,.85);">{{ user_email }}</span>
+    <a class="back" href="/logout" style="margin-left:14px; margin-right:0;">Se déconnecter</a>
+    <a class="back" href="https://aidaux-portail.vercel.app" style="margin-left:0;">← Portail</a>
+  </div>
+
+  <div class="container">
+    <div class="toolbar">
+      <div class="field">
+        <label for="agence">Agence</label>
+        <div class="select-wrap"><select id="agence"></select></div>
+      </div>
+      <div class="field">
+        <label for="mois">Mois</label>
+        <div class="select-wrap"><select id="mois"></select></div>
+      </div>
+      <div class="spacer"></div>
+      <button class="btn" id="addRow">＋ Salarié</button>
+      <button class="btn secondary" id="exportCsv">⬇ Export CSV</button>
+      <button class="btn ghost" id="printBtn">🖨 Imprimer</button>
+    </div>
+
+    <div class="stats">
+      <div class="chip"><div class="ic a">👥</div><div><div class="k">Salariés</div><div class="v" id="statCount">—</div></div></div>
+    </div>
+
+    <div class="tabs" id="tabs"></div>
+
+    <div class="legend" id="legend">
+      <span><i class="swatch" style="background:#f0f3f6"></i> « dès MM/AA » = ouverture après la période d'essai</span>
+      <span class="hint">Ticket resto : déblocage auto après 2 mois d'essai. Double-cliquez la case pour la marquer « NON » (ne bénéficie pas).</span>
+    </div>
+
+    <div class="table-wrap">
+    <table id="grid">
+      <thead id="thead"></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+    </div>
+
+    <div class="row-actions">
+      <button class="btn ghost" id="addRow2">＋ Ajouter un salarié</button>
+    </div>
+  </div>
+
+<script>
+"use strict";
+
+// ---- Onglets & colonnes (les onglets partagent la même liste de salariés) ----
+// La colonne « Salarié » (nom) est toujours affichée en premier, la corbeille en dernier.
+const TABS = [
+  {
+    id: "prepaie", label: "Pré-paie",
+    cols: [
+      { key: "embauche",    label: "Date d'embauche" },
+      { key: "contrat",     label: "Contrat" },
+      { key: "avenant",     label: "Avenant",           sub: "nouveau contrat (h)" },
+      { key: "avenantDate", label: "Date de signature", sub: "de l'avenant (jj/mm/aaaa)" },
+      { key: "trNbre",      label: "Ticket resto",      sub: "Nbre — déblocage auto", type: "ticket" },
+      { key: "titreTr",     label: "Titre de transport" },
+      { key: "forfaitKm",   label: "Forfait KMS" },
+      { key: "kmsPdt",      label: "KMS PDT" },
+      { key: "avNature",    label: "Avantage nature" },
+      { key: "acompte",     label: "Acompte" },
+      { key: "divers",      label: "Divers", minWidth: 150 },
+    ],
+  },
+  {
+    id: "heures", label: "Heures réalisées",
+    cols: [
+      { key: "contrat",   label: "Contrat" },
+      { key: "realisees", label: "Heures réalisées" },
+      { key: "heuresObs", label: "Observations", wide: true },
+    ],
+  },
+  {
+    id: "pertes", label: "Pertes / Dispenses",
+    cols: [
+      { key: "pertesDispense", label: "Perte de mission / Dispense d'intervention", wide: true },
+      { key: "pertesDate",     label: "Date" },
+      { key: "pertesObs",      label: "Divers", wide: true },
+    ],
+  },
+];
+function curTabDef() { return TABS.find(t => t.id === curTab) || TABS[0]; }
+// colonnes réellement rendues : Salarié + colonnes de l'onglet
+function tabColumns() {
+  return [{ key: "nom", type: "name", label: "Salarié" }].concat(curTabDef().cols);
+}
+
+// cycle des couleurs au double-clic (couleurs AID'AUX)
+const HL = ["", "hl-teal", "hl-orange", "hl-navy"];
+const TICKET_MARKS = ["hl-orange", "hl-navy"]; // = « ne bénéficie pas »
+
+// ---- Agences & effectifs de départ ----
+const AGENCES = {
+  vendenheim: {
+    nom: "Vendenheim",
+    salaries: [
+      ["ABOUDA Habiba","01/03/2026","104"],
+      ["BILOMBA Séraphine","12/12/2025","151,67"],
+      ["BORAS Ouassila","19/05/2025","40"],
+      ["CAVILLIER Lova","05/08/2026","8,67"],
+      ["CHATILLON Aurélie","12/06/2025","151,67"],
+      ["DEL MINCHONI Victor","01/08/2026","40"],
+      ["ERDOGAN Gulizar","24/03/2026","8,67"],
+      ["GRIESBACH Muriel","11/07/2025","85"],
+      ["HOUSSEIN WABERI Kadra","21/04/2026","8,67"],
+      ["KALT Coralyne","19/05/2026","8,67"],
+      ["KONDZIELA Cassandra","19/01/2026","8,67"],
+      ["MATT Claudia","09/02/2026","8,67"],
+      ["NEUBURGER Laura","03/11/2025","40"],
+      ["ONIMUS Claire","04/08/2026","8,67"],
+      ["RAUSER Sony","06/03/2026","151,67"],
+      ["RINK Aurélie","03/02/2026","8,67"],
+      ["TEKIN Dilek","13/12/2025","8,67"],
+      ["WEBER Angèle","01/06/2026","8,67"],
+      ["WELSCH Andréia","01/07/2026","8,67"],
+    ],
+  },
+  cronenbourg: {
+    nom: "Cronenbourg",
+    salaries: [
+      ["Acker Tatiana","","151,67"],["Akhonzada Abduljabar","","104"],["Amiri Saiedeh","","104"],
+      ["Bakemba Prisca","","120"],["Blanchet Yoann","","151,67"],["Bonnet Solange","","26"],
+      ["Bouzagloui Nadia","","15"],["Broladze Mariami","","104"],["Cadoni Laura","","150,4"],
+      ["Deutsch Maëva","","115"],["Diaboungana, Sylvie","","65"],["Diadhiou Chantal","","130"],
+      ["Diallo Djeinabou","","151,67"],["Dietrich, Aurore","","130"],["Dingeldein, Prescilla","","80"],
+      ["Dix Annie","","151,67"],["Donati Anastasia","","60"],["Duchene Monique","","120"],
+      ["El Aydi Asmae","","70"],["Fischer Léa","","151,67"],["Gauthier, Lucie","","151,67"],
+      ["Glaess Rajaa","","151,67"],["Hend Ibtissem","","100"],["Hohnadel Déborah","","80"],
+      ["Junieres Laure","","104"],["Kamiza Tamatafika","","130"],["Khedir, Khadija","","50"],
+      ["Kokhtashvili Ekaterine","","104"],["Kurilko Tetiana","","104"],["Le Guen Laura","","130"],
+      ["Leonhart Kalina","","105"],["Mansoor Sodaba","","104"],["Marlier Sandra","","130"],
+      ["Maurice Alain","","151,67"],["Mayetela Evelyne","","50"],["Mugisha Yannick","","120"],
+      ["Naman Omar","","104"],["Neyra-Prado, Rosa","","151,67"],["Nivet, Sylvie","","110"],
+      ["Njezi Linda","","100"],["Nohovitsyna Irina","","120"],["Nsabimana Gérard","","151,67"],
+      ["Pain John","","151,67"],["Papikyan Anna","","85"],["Pfister Prescilla","","80"],
+      ["Rohrbacher Jennifer","","115"],["Rosca Eléna","","110"],["Saddouki Saliha","","30"],
+      ["Seewald Jean-Jacques","","151,67"],["Smoki Nadia","","100"],["Smolarczuk Izabela","","140"],
+      ["Tchouate Tankoua Prisca","","151,67"],["Ture Fatou","","130"],["Zarcos Jessica","","30"],
+    ],
+  },
+  administratif: {
+    nom: "Personnel administratif",
+    salaries: [
+      ["Soulliez Jennifer","","120"],
+      ["Mischel Marie","","151,67"],
+      ["Suplon Tatiana","","151,67"],
+      ["Goetz Léa","","151,67"],
+      ["Fux Magali","","151,67"],
+    ],
+  },
+};
+
+// ---- Mois disponibles ----
+const MOIS = [
+  "Septembre 2026","Août 2026","Juillet 2026","Juin 2026","Mai 2026","Avril 2026",
+  "Mars 2026","Février 2026","Janvier 2026","Décembre 2025","Novembre 2025",
+  "Octobre 2025","Septembre 2025","Août 2025","Juillet 2025","Juin 2025"
+];
+
+const STORE_KEY = "aidaux_prepaie_v1";
+
+// ---- State ----
+let store = loadStore();
+let curAgence = "vendenheim";
+let curMois = MOIS[0];
+let curTab = "prepaie";
+
+function loadStore() {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch (e) {}
+  return {};
+}
+function saveStore() {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(store)); } catch (e) {}
+}
+
+// toutes les clés utilisées, tous onglets confondus
+const ALL_KEYS = ["nom"].concat(
+  TABS.reduce((a, t) => a.concat(t.cols.map(c => c.key)), [])
+);
+function emptyRow(seed) {
+  const r = {};
+  ALL_KEYS.forEach(k => r[k] = "");
+  r._hl = {};
+  if (seed) { r.nom = seed[0]||""; r.embauche = seed[1]||""; r.contrat = seed[2]||""; }
+  return r;
+}
+
+function getSheet(agence, mois) {
+  store[agence] = store[agence] || {};
+  if (!store[agence][mois]) {
+    // seed from the agency roster the first time a sheet is opened
+    store[agence][mois] = AGENCES[agence].salaries.map(s => emptyRow(s));
+    saveStore();
+  }
+  return store[agence][mois];
+}
+
+// ---- Éligibilité Ticket resto ----
+// Règle : embauche + 2 mois (fin de période d'essai), puis le mois suivant.
+// Ex. embauche le 20/05 -> éligible à partir du 01/08.
+const FR_MONTHS = {
+  "janvier":0,"février":1,"fevrier":1,"mars":2,"avril":3,"mai":4,"juin":5,
+  "juillet":6,"août":7,"aout":7,"septembre":8,"octobre":9,"novembre":10,
+  "décembre":11,"decembre":11
+};
+const FR_MONTH_NAMES = ["janvier","février","mars","avril","mai","juin",
+  "juillet","août","septembre","octobre","novembre","décembre"];
+
+function parseDateFr(s) { // "jj/mm/aaaa" -> {y,m,d} ou null
+  const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec((s || "").trim());
+  if (!m) return null;
+  return { d: +m[1], m: +m[2] - 1, y: +m[3] };
+}
+function parseMois(s) { // "Août 2026" -> {y,m} ou null
+  const p = (s || "").toLowerCase().trim().split(/\s+/);
+  if (p.length < 2 || !(p[0] in FR_MONTHS)) return null;
+  return { m: FR_MONTHS[p[0]], y: parseInt(p[1], 10) };
+}
+// Renvoie le 1er mois d'éligibilité en index absolu (année*12+mois), ou null
+function eligIndex(embauche) {
+  const d = parseDateFr(embauche);
+  if (!d) return null;
+  // mois de début + 2 (fin d'essai) + 1 (mois suivant) = +3
+  return d.y * 12 + d.m + 3;
+}
+function eligLabel(embauche) {
+  const idx = eligIndex(embauche);
+  if (idx == null) return "";
+  const y = Math.floor(idx / 12), m = idx % 12;
+  return "01/" + String(m + 1).padStart(2, "0") + "/" + y;
+}
+function eligShort(embauche) { // "08/26"
+  const idx = eligIndex(embauche);
+  if (idx == null) return "";
+  const y = Math.floor(idx / 12), m = idx % 12;
+  return String(m + 1).padStart(2, "0") + "/" + String(y).slice(-2);
+}
+// true si, pour le mois affiché, le salarié a droit aux tickets resto
+function ticketDebloque(embauche, mois) {
+  const e = eligIndex(embauche);
+  const mm = parseMois(mois);
+  if (e == null || !mm) return true; // pas de date -> on ne verrouille pas
+  return (mm.y * 12 + mm.m) >= e;
+}
+
+// ---- Rendering ----
+function renderHead(cols) {
+  const thead = document.getElementById("thead");
+  thead.innerHTML = "";
+  const tr = document.createElement("tr");
+  const thNum = document.createElement("th");
+  thNum.className = "rownum"; thNum.textContent = "#";
+  tr.appendChild(thNum);
+  cols.forEach(col => {
+    const th = document.createElement("th");
+    if (col.type === "name") th.className = "hname";
+    if (col.type === "ticket") th.className = "group";
+    th.innerHTML = col.label + (col.sub ? '<br><span class="th-sub">' + col.sub + '</span>' : "");
+    tr.appendChild(th);
+  });
+  const thDel = document.createElement("th");
+  thDel.className = "del";
+  tr.appendChild(thDel);
+  thead.appendChild(tr);
+}
+
+function render() {
+  const cols = tabColumns();
+  renderHead(cols);
+
+  // la légende Ticket resto n'a de sens que dans l'onglet Pré-paie
+  document.getElementById("legend").style.display =
+    (curTab === "prepaie") ? "" : "none";
+
+  const tbody = document.getElementById("tbody");
+  tbody.innerHTML = "";
+  const rows = getSheet(curAgence, curMois);
+
+  rows.forEach((row, ri) => {
+    if (!row._hl) row._hl = {};
+    const tr = document.createElement("tr");
+
+    const num = document.createElement("td");
+    num.className = "rownum";
+    num.textContent = ri + 1;
+    tr.appendChild(num);
+
+    cols.forEach(col => {
+      const td = document.createElement("td");
+      if (col.type === "name") td.className = "name";
+      if (col.wide) td.classList.add("wide");
+      // La case Ticket resto n'accepte que le marquage « ne bénéficie pas » ;
+      // on nettoie tout autre marquage (anciennes couleurs) resté coincé.
+      if (col.type === "ticket" && row._hl[col.key]
+          && TICKET_MARKS.indexOf(row._hl[col.key]) < 0) {
+        row._hl[col.key] = "";
+        saveStore();
+      }
+      const hl = row._hl[col.key];
+      if (hl) td.classList.add(hl);
+
+      // cycle de couleurs propre à chaque type de colonne
+      const cycle = (col.type === "ticket") ? ["", "hl-orange", "hl-navy"] : HL;
+
+      const inp = document.createElement("input");
+      inp.type = "text";
+      inp.value = row[col.key] || "";
+      inp.addEventListener("input", () => { row[col.key] = inp.value; saveStore(); });
+      if (col.minWidth) inp.style.minWidth = col.minWidth + "px";
+      // double-clic = change la couleur de fond de la cellule
+      td.addEventListener("dblclick", (e) => {
+        if (col.type === "name") return;
+        const cur = row._hl[col.key] || "";
+        const idx = cycle.indexOf(cur);
+        const next = cycle[((idx < 0 ? 0 : idx) + 1) % cycle.length];
+        HL.forEach(h => h && td.classList.remove(h));
+        if (next) td.classList.add(next);
+        row._hl[col.key] = next;
+        saveStore();
+        if (col.type === "ticket") render(); // réapplique le statut de la case
+      });
+
+      // Ticket resto : couleur manuelle prioritaire, sinon déblocage auto
+      if (col.type === "ticket") {
+        if (hl) {
+          // Une couleur posée à la main = statut manuel (ex : ne bénéficie pas)
+          inp.disabled = true;
+          inp.value = "";
+          if (TICKET_MARKS.indexOf(hl) >= 0) {
+            inp.placeholder = "NON";
+            td.title = "Ne bénéficie pas des titres restaurant";
+          }
+        } else if (ticketDebloque(row.embauche, curMois)) {
+          td.classList.add("tr-ok");
+        } else {
+          td.classList.add("tr-lock");
+          inp.disabled = true;
+          inp.value = "";
+          inp.style.display = "none";
+          const idx2 = eligIndex(row.embauche);
+          const badge = document.createElement("span");
+          badge.className = "tr-badge";
+          if (idx2 != null) {
+            const y = Math.floor(idx2 / 12), m = idx2 % 12;
+            const nom = FR_MONTH_NAMES[m];
+            badge.textContent = "dès " + nom.charAt(0).toUpperCase() + nom.slice(1)
+              + " " + String(y).slice(-2);
+          } else {
+            badge.textContent = "—";
+          }
+          td.title = "Titres restaurant à partir du " + eligLabel(row.embauche)
+            + " (fin de période d'essai)";
+          td.appendChild(badge);
+        }
+      }
+
+      td.appendChild(inp);
+      tr.appendChild(td);
+    });
+
+    const del = document.createElement("td");
+    del.className = "del";
+    const btn = document.createElement("button");
+    btn.textContent = "✕";
+    btn.title = "Supprimer ce salarié";
+    btn.addEventListener("click", () => {
+      if (confirm("Supprimer « " + (row.nom || "cette ligne") + " » ?")) {
+        rows.splice(ri, 1);
+        saveStore();
+        render();
+      }
+    });
+    del.appendChild(btn);
+    tr.appendChild(del);
+
+    tbody.appendChild(tr);
+  });
+
+  document.getElementById("statCount").textContent = rows.length;
+}
+
+function addRow() {
+  const rows = getSheet(curAgence, curMois);
+  rows.push(emptyRow(null));
+  saveStore();
+  render();
+  // focus le nom de la nouvelle ligne
+  const inputs = document.querySelectorAll("#tbody tr:last-child input");
+  if (inputs[0]) inputs[0].focus();
+}
+
+function exportCsv() {
+  const rows = getSheet(curAgence, curMois);
+  const cols = tabColumns();
+  const sep = ";";
+  const esc = v => '"' + String(v == null ? "" : v).replace(/"/g, '""') + '"';
+  const lines = [cols.map(c => esc(c.label)).join(sep)];
+  rows.forEach(r => {
+    lines.push(cols.map(c => esc(r[c.key])).join(sep));
+  });
+  const csv = "﻿" + lines.join("\r\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "prepaie_" + curTab + "_" + AGENCES[curAgence].nom
+    + "_" + curMois.replace(/\s+/g, "_") + ".csv";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function renderTabs() {
+  const bar = document.getElementById("tabs");
+  bar.innerHTML = "";
+  TABS.forEach(t => {
+    const b = document.createElement("div");
+    b.className = "tab" + (t.id === curTab ? " active" : "");
+    b.textContent = t.label;
+    b.addEventListener("click", () => { curTab = t.id; renderTabs(); render(); });
+    bar.appendChild(b);
+  });
+}
+
+// ---- Surlignage de la ligne active (clic/saisie dans une case) ----
+function initRowHighlight() {
+  const grid = document.getElementById("grid");
+  grid.addEventListener("focusin", (e) => {
+    if (e.target.tagName !== "INPUT") return;
+    const tr = e.target.closest("tr");
+    if (!tr) return;
+    grid.querySelectorAll("tbody tr.row-selected").forEach(r => {
+      if (r !== tr) r.classList.remove("row-selected");
+    });
+    tr.classList.add("row-selected");
+  });
+}
+
+// ---- Init controls ----
+function initControls() {
+  const selA = document.getElementById("agence");
+  Object.keys(AGENCES).forEach(k => {
+    const o = document.createElement("option");
+    o.value = k; o.textContent = AGENCES[k].nom;
+    selA.appendChild(o);
+  });
+  selA.value = curAgence;
+  selA.addEventListener("change", () => { curAgence = selA.value; render(); });
+
+  const selM = document.getElementById("mois");
+  MOIS.forEach(m => {
+    const o = document.createElement("option");
+    o.value = m; o.textContent = m;
+    selM.appendChild(o);
+  });
+  selM.value = curMois;
+  selM.addEventListener("change", () => { curMois = selM.value; render(); });
+
+  document.getElementById("addRow").addEventListener("click", addRow);
+  document.getElementById("addRow2").addEventListener("click", addRow);
+  document.getElementById("exportCsv").addEventListener("click", exportCsv);
+  document.getElementById("printBtn").addEventListener("click", () => window.print());
+}
+
+initControls();
+initRowHighlight();
+renderTabs();
+render();
+</script>
+</body>
+</html>
