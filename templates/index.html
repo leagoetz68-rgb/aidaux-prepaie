@@ -576,11 +576,10 @@ async function ensureSheetLoaded(agence, mois) {
       if (data.rows) { store[agence][mois] = data.rows; return; }
     }
   } catch (e) {}
-  // Rien côté serveur : on amorce depuis le trousseau de l'agence,
-  // et on l'enregistre tout de suite pour que ce soit la version
-  // partagée dès la première ouverture (par n'importe qui).
+  // Rien côté serveur : on amorce depuis le trousseau de l'agence, en
+  // mémoire seulement (on n'écrit rien tant que personne n'a rien tapé,
+  // pour ne jamais bloquer un futur import de vraies données).
   store[agence][mois] = AGENCES[agence].salaries.map(s => emptyRow(s));
-  await pushSheet(agence, mois);
 }
 
 // Bascule l'agence/le mois affiché : charge la feuille depuis le serveur
