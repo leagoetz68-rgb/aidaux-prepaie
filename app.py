@@ -87,6 +87,22 @@ def api_put_sheet():
     return jsonify({"ok": True})
 
 
+@app.route("/api/admin/reset-sheets")
+def api_reset_sheets():
+    # Remise à zéro ponctuelle : supprime toutes les feuilles enregistrées
+    # (utilisé une seule fois pour repartir sur une base saine après un bug
+    # de test). À retirer une fois utilisé.
+    conn = auth._conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM prepaie_sheets")
+            n = cur.rowcount
+        conn.commit()
+    finally:
+        conn.close()
+    return jsonify({"ok": True, "supprimees": n})
+
+
 @app.route("/")
 def index():
     return render_template("index.html", user_email=session.get("user_email", ""))
