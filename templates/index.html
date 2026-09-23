@@ -373,6 +373,7 @@
 
     <div class="stats">
       <div class="chip"><div class="ic a">👥</div><div><div class="k">Salariés</div><div class="v" id="statCount">—</div></div></div>
+      <span id="syncStatus" style="align-self:center; margin-left:14px; font-size:.82rem; color:#7a8a99;"></span>
     </div>
 
     <div class="tabs" id="tabs"></div>
@@ -511,23 +512,80 @@ const MOIS = [
   "Octobre 2025","Septembre 2025","Août 2025","Juillet 2025","Juin 2025"
 ];
 
-const STORE_KEY = "aidaux_prepaie_v1";
+const STORE_KEY = "aidaux_prepaie_v1"; // conservé pour compat, plus utilisé pour la sauvegarde
 
 // ---- State ----
-let store = loadStore();
+let store = {}; // cache mémoire des feuilles déjà chargées depuis le serveur
 let curAgence = "vendenheim";
 let curMois = MOIS[0];
 let curTab = "prepaie";
 
-function loadStore() {
-  try {
-    const raw = localStorage.getItem(STORE_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch (e) {}
-  return {};
+// ---- Persistance partagée (base commune, plus de localStorage) ----
+let saveTimer = null;
+function setSyncStatus(state) {
+  const el = document.getElementById("syncStatus");
+  if (!el) return;
+  if (state === "saving") { el.textContent = "Enregistrement…"; el.style.opacity = "0.7"; }
+  else if (state === "ok") { el.textContent = "Enregistré"; el.style.opacity = "0.55"; }
+  else if (state === "error") { el.textContent = "⚠ Échec de l'enregistrement — réessaie"; el.style.opacity = "1"; }
+  else { el.textContent = ""; }
 }
+
+async function pushSheet(agence, mois) {
+  const rows = (store[agence] && store[agence][mois]) || [];
+  setSyncStatus("saving");
+  try {
+    const resp = await fetch(
+      "/api/sheet?agence=" + encodeURIComponent(agence) + "&mois=" + encodeURIComponent(mois),
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rows: rows }),
+      }
+    );
+    if (!resp.ok) throw new Error("save failed");
+    setSyncStatus("ok");
+  } catch (e) {
+    setSyncStatus("error");
+  }
+}
+
+// Appelé à chaque modification d'une case ; regroupe les sauvegardes réseau
+// (une seule requête ~700ms après la dernière frappe) plutôt qu'une par lettre tapée.
 function saveStore() {
-  try { localStorage.setItem(STORE_KEY, JSON.stringify(store)); } catch (e) {}
+  if (saveTimer) clearTimeout(saveTimer);
+  const agence = curAgence, mois = curMois;
+  saveTimer = setTimeout(() => { pushSheet(agence, mois); }, 700);
+}
+
+async function ensureSheetLoaded(agence, mois) {
+  store[agence] = store[agence] || {};
+  if (store[agence][mois]) return; // déjà en mémoire, rien à recharger
+  try {
+    const resp = await fetch(
+      "/api/sheet?agence=" + encodeURIComponent(agence) + "&mois=" + encodeURIComponent(mois)
+    );
+    if (resp.ok) {
+      const data = await resp.json();
+      if (data.rows) { store[agence][mois] = data.rows; return; }
+    }
+  } catch (e) {}
+  // Rien côté serveur : on amorce depuis le trousseau de l'agence,
+  // et on l'enregistre tout de suite pour que ce soit la version
+  // partagée dès la première ouverture (par n'importe qui).
+  store[agence][mois] = AGENCES[agence].salaries.map(s => emptyRow(s));
+  await pushSheet(agence, mois);
+}
+
+// Bascule l'agence/le mois affiché : charge la feuille depuis le serveur
+// (avec petit indicateur de chargement) puis affiche.
+async function switchSheet(agence, mois) {
+  curAgence = agence;
+  curMois = mois;
+  const tbody = document.getElementById("tbody");
+  if (tbody) tbody.innerHTML = '<tr><td style="padding:18px;color:#7a8a99;">Chargement…</td></tr>';
+  await ensureSheetLoaded(agence, mois);
+  render();
 }
 
 // toutes les clés utilisées, tous onglets confondus
@@ -545,9 +603,9 @@ function emptyRow(seed) {
 function getSheet(agence, mois) {
   store[agence] = store[agence] || {};
   if (!store[agence][mois]) {
-    // seed from the agency roster the first time a sheet is opened
+    // filet de sécurité seulement (ne devrait pas arriver : switchSheet()
+    // charge toujours la feuille avant d'appeler render()).
     store[agence][mois] = AGENCES[agence].salaries.map(s => emptyRow(s));
-    saveStore();
   }
   return store[agence][mois];
 }
@@ -803,7 +861,7 @@ function initControls() {
     selA.appendChild(o);
   });
   selA.value = curAgence;
-  selA.addEventListener("change", () => { curAgence = selA.value; render(); });
+  selA.addEventListener("change", () => { switchSheet(selA.value, curMois); });
 
   const selM = document.getElementById("mois");
   MOIS.forEach(m => {
@@ -812,7 +870,7 @@ function initControls() {
     selM.appendChild(o);
   });
   selM.value = curMois;
-  selM.addEventListener("change", () => { curMois = selM.value; render(); });
+  selM.addEventListener("change", () => { switchSheet(curAgence, selM.value); });
 
   document.getElementById("addRow").addEventListener("click", addRow);
   document.getElementById("addRow2").addEventListener("click", addRow);
@@ -823,7 +881,7 @@ function initControls() {
 initControls();
 initRowHighlight();
 renderTabs();
-render();
+switchSheet(curAgence, curMois);
 </script>
 </body>
 </html>
