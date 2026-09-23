@@ -366,7 +366,7 @@
         <div class="select-wrap"><select id="mois"></select></div>
       </div>
       <div class="spacer"></div>
-      <button class="btn" id="addRow">＋ Salarié</button>
+      <button class="btn ghost" id="addRow2">＋ Ajouter un salarié</button>
       <button class="btn secondary" id="exportCsv">⬇ Export CSV</button>
       <button class="btn ghost" id="printBtn">🖨 Imprimer</button>
     </div>
@@ -394,10 +394,6 @@
       <thead id="thead"></thead>
       <tbody id="tbody"></tbody>
     </table>
-    </div>
-
-    <div class="row-actions">
-      <button class="btn ghost" id="addRow2">＋ Ajouter un salarié</button>
     </div>
   </div>
 
@@ -878,12 +874,14 @@ function scheduleSort() {
 
 function addRow() {
   const rows = getSheet(curAgence, curMois);
-  rows.push(emptyRow(null));
+  const newRow = emptyRow(null);
+  rows.push(newRow);
   saveStore();
   render();
-  // focus le nom de la nouvelle ligne
-  const inputs = document.querySelectorAll("#tbody tr:last-child input");
-  if (inputs[0]) inputs[0].focus();
+  // focus le nom de la nouvelle ligne (elle peut apparaître n'importe où
+  // dans le tri alphabétique, une ligne sans nom passe en premier)
+  const inp = document.querySelector('[data-cell-key="' + newRow._id + ':nom"]');
+  if (inp) inp.focus();
 }
 
 function exportCsv() {
@@ -954,7 +952,6 @@ function initControls() {
   selM.value = curMois;
   selM.addEventListener("change", () => { switchSheet(curAgence, selM.value); });
 
-  document.getElementById("addRow").addEventListener("click", addRow);
   document.getElementById("addRow2").addEventListener("click", addRow);
   document.getElementById("exportCsv").addEventListener("click", exportCsv);
   document.getElementById("printBtn").addEventListener("click", () => window.print());
