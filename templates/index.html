@@ -528,6 +528,7 @@ let curTab = "prepaie";
 
 // ---- Persistance partagée (base commune, plus de localStorage) ----
 let saveTimer = null;
+let pendingSave = null; // { agence, mois } en attente d'envoi (utilisé pour forcer l'envoi si la page se ferme trop vite)
 function setSyncStatus(state) {
   const el = document.getElementById("syncStatus");
   if (!el) return;
@@ -554,15 +555,45 @@ async function pushSheet(agence, mois) {
   } catch (e) {
     setSyncStatus("error");
   }
+  if (pendingSave && pendingSave.agence === agence && pendingSave.mois === mois) pendingSave = null;
+}
+
+// Envoi immédiat et fiable (utilisé quand l'onglet se ferme/se cache) : sendBeacon
+// part même si la page est en train de se décharger, contrairement à fetch().
+function flushPendingSaveNow() {
+  if (!pendingSave) return;
+  const { agence, mois } = pendingSave;
+  const rows = (store[agence] && store[agence][mois]) || [];
+  const url = "/api/sheet?agence=" + encodeURIComponent(agence) + "&mois=" + encodeURIComponent(mois);
+  try {
+    if (navigator.sendBeacon) {
+      const blob = new Blob([JSON.stringify({ rows: rows })], { type: "application/json" });
+      navigator.sendBeacon(url + "&via=beacon", blob);
+    } else {
+      fetch(url, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ rows: rows }), keepalive: true });
+    }
+  } catch (e) {}
+  pendingSave = null;
+  if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
 }
 
 // Appelé à chaque modification d'une case ; regroupe les sauvegardes réseau
 // (une seule requête ~700ms après la dernière frappe) plutôt qu'une par lettre tapée.
+// Si la page se ferme/se cache avant ces 700ms, flushPendingSaveNow() prend le relais.
 function saveStore() {
   if (saveTimer) clearTimeout(saveTimer);
   const agence = curAgence, mois = curMois;
+  pendingSave = { agence, mois };
   saveTimer = setTimeout(() => { pushSheet(agence, mois); }, 700);
 }
+
+// Filet de sécurité : dès que l'onglet passe en arrière-plan ou se ferme,
+// on envoie tout de suite ce qui était encore en attente.
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") flushPendingSaveNow();
+});
+window.addEventListener("pagehide", flushPendingSaveNow);
+window.addEventListener("beforeunload", flushPendingSaveNow);
 
 async function ensureSheetLoaded(agence, mois) {
   store[agence] = store[agence] || {};
