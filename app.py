@@ -1,6 +1,7 @@
+import json
 import os
 
-from flask import Flask, render_template, send_from_directory, session
+from flask import Flask, jsonify, render_template, request, send_from_directory, session
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "change-moi-en-prod")
@@ -14,6 +15,76 @@ import auth  # noqa: E402
 auth.init_auth_db()
 app.register_blueprint(auth.bp)
 auth.proteger(app)
+
+
+# ---- Stockage partagé du tableau (une ligne par agence + mois) ----
+# Remplace l'ancien localStorage : toutes les personnes connectées voient
+# et modifient les mêmes données, stockées dans la même base Neon que les
+# comptes.
+def init_sheets_db():
+    conn = auth._conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS prepaie_sheets (
+                    agence TEXT NOT NULL,
+                    mois TEXT NOT NULL,
+                    data JSONB NOT NULL,
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                    PRIMARY KEY (agence, mois)
+                )
+                """
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+init_sheets_db()
+
+
+@app.route("/api/sheet", methods=["GET"])
+def api_get_sheet():
+    agence = request.args.get("agence", "")
+    mois = request.args.get("mois", "")
+    conn = auth._conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT data FROM prepaie_sheets WHERE agence = %s AND mois = %s",
+                (agence, mois),
+            )
+            row = cur.fetchone()
+    finally:
+        conn.close()
+    if row is None:
+        return jsonify({"rows": None}), 404
+    return jsonify({"rows": row[0]})
+
+
+@app.route("/api/sheet", methods=["PUT"])
+def api_put_sheet():
+    agence = request.args.get("agence", "")
+    mois = request.args.get("mois", "")
+    body = request.get_json(silent=True) or {}
+    rows = body.get("rows", [])
+    conn = auth._conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO prepaie_sheets (agence, mois, data, updated_at)
+                VALUES (%s, %s, %s, now())
+                ON CONFLICT (agence, mois)
+                DO UPDATE SET data = EXCLUDED.data, updated_at = now()
+                """,
+                (agence, mois, json.dumps(rows)),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+    return jsonify({"ok": True})
 
 
 @app.route("/")
