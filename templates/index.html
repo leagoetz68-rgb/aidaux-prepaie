@@ -604,7 +604,11 @@ async function ensureSheetLoaded(agence, mois) {
     );
     if (resp.ok) {
       const data = await resp.json();
-      if (data.rows) { store[agence][mois] = data.rows; return; }
+      if (data.rows) {
+        data.rows.forEach(r => { if (!r._id) r._id = uid(); });
+        store[agence][mois] = data.rows;
+        return;
+      }
     }
   } catch (e) {}
   // Rien côté serveur : on amorce depuis le trousseau de l'agence, en
@@ -628,10 +632,15 @@ async function switchSheet(agence, mois) {
 const ALL_KEYS = ["nom"].concat(
   TABS.reduce((a, t) => a.concat(t.cols.map(c => c.key)), [])
 );
+function uid() {
+  return Math.random().toString(36).slice(2) + Date.now().toString(36);
+}
+
 function emptyRow(seed) {
   const r = {};
   ALL_KEYS.forEach(k => r[k] = "");
   r._hl = {};
+  r._id = uid();
   if (seed) { r.nom = seed[0]||""; r.embauche = seed[1]||""; r.contrat = seed[2]||""; }
   return r;
 }
@@ -756,14 +765,15 @@ function render() {
       const inp = document.createElement("input");
       inp.type = "text";
       inp.value = row[col.key] || "";
-      inp.addEventListener("input", () => { row[col.key] = inp.value; saveStore(); });
+      inp.dataset.cellKey = row._id + ":" + col.key;
+      inp.addEventListener("input", () => {
+        row[col.key] = inp.value;
+        saveStore();
+        if (col.type === "name") scheduleSort();
+      });
       if (col.type === "name") {
-        inp.addEventListener("blur", () => {
-          const before = rows.slice();
-          rows.sort((a, b) => (a.nom || "").localeCompare(b.nom || "", "fr", { sensitivity: "base" }));
-          const changed = rows.some((r, i) => r !== before[i]);
-          if (changed) { saveStore(); render(); }
-        });
+        inp.addEventListener("blur", () => sortRowsNow());
+        inp.addEventListener("keydown", (e) => { if (e.key === "Enter") inp.blur(); });
       }
       if (col.minWidth) inp.style.minWidth = col.minWidth + "px";
       // double-clic = change la couleur de fond de la cellule
@@ -836,6 +846,35 @@ function render() {
   });
 
   document.getElementById("statCount").textContent = rows.length;
+}
+
+function sortRowsNow() {
+  const rows = getSheet(curAgence, curMois);
+  const active = document.activeElement;
+  const cellKey = (active && active.dataset) ? active.dataset.cellKey : null;
+  const selStart = (active && active.selectionStart != null) ? active.selectionStart : null;
+
+  const before = rows.slice();
+  rows.sort((a, b) => (a.nom || "").localeCompare(b.nom || "", "fr", { sensitivity: "base" }));
+  const changed = rows.some((r, i) => r !== before[i]);
+  if (!changed) return;
+
+  saveStore();
+  render();
+
+  if (cellKey) {
+    const el = document.querySelector('[data-cell-key="' + cellKey.replace(/"/g, '\\"') + '"]');
+    if (el) {
+      el.focus();
+      if (selStart != null && el.setSelectionRange) { try { el.setSelectionRange(selStart, selStart); } catch (e) {} }
+    }
+  }
+}
+
+let sortTimer = null;
+function scheduleSort() {
+  if (sortTimer) clearTimeout(sortTimer);
+  sortTimer = setTimeout(sortRowsNow, 900);
 }
 
 function addRow() {
