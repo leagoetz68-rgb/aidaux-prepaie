@@ -757,6 +757,14 @@ function render() {
       inp.type = "text";
       inp.value = row[col.key] || "";
       inp.addEventListener("input", () => { row[col.key] = inp.value; saveStore(); });
+      if (col.type === "name") {
+        inp.addEventListener("blur", () => {
+          const before = rows.slice();
+          rows.sort((a, b) => (a.nom || "").localeCompare(b.nom || "", "fr", { sensitivity: "base" }));
+          const changed = rows.some((r, i) => r !== before[i]);
+          if (changed) { saveStore(); render(); }
+        });
+      }
       if (col.minWidth) inp.style.minWidth = col.minWidth + "px";
       // double-clic = change la couleur de fond de la cellule
       td.addEventListener("dblclick", (e) => {
