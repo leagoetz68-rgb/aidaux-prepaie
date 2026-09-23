@@ -63,7 +63,7 @@ def api_get_sheet():
     return jsonify({"rows": row[0]})
 
 
-@app.route("/api/sheet", methods=["PUT"])
+@app.route("/api/sheet", methods=["PUT", "POST"])
 def api_put_sheet():
     agence = request.args.get("agence", "")
     mois = request.args.get("mois", "")
