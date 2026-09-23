@@ -376,6 +376,12 @@
       <span id="syncStatus" style="align-self:center; margin-left:14px; font-size:.82rem; color:#7a8a99;"></span>
     </div>
 
+    <div id="importBanner" style="display:none; margin:0 0 14px; padding:12px 16px; background:#fff7e0; border:1px solid #f0d98a; border-radius:10px; font-size:.9rem; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+      <span style="flex:1; min-width:220px;">📦 D'anciennes données ont été trouvées dans <b>ce navigateur</b> (avant la mise à jour). Veux-tu les envoyer vers la base partagée ?</span>
+      <button class="btn" id="importOldData" style="padding:7px 14px;">Importer</button>
+      <button class="btn ghost" id="dismissImport" style="padding:7px 14px;">Ignorer</button>
+    </div>
+
     <div class="tabs" id="tabs"></div>
 
     <div class="legend" id="legend">
@@ -878,8 +884,75 @@ function initControls() {
   document.getElementById("printBtn").addEventListener("click", () => window.print());
 }
 
+// ---- Récupération des anciennes données (localStorage, avant la migration) ----
+function getOldLocalStore() {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return (parsed && typeof parsed === "object" && Object.keys(parsed).length) ? parsed : null;
+  } catch (e) { return null; }
+}
+
+async function importOldLocalStore() {
+  const old = getOldLocalStore();
+  if (!old) return;
+  const btn = document.getElementById("importOldData");
+  if (btn) { btn.disabled = true; btn.textContent = "Import en cours…"; }
+
+  let imported = 0, skipped = 0;
+  for (const agence of Object.keys(old)) {
+    for (const mois of Object.keys(old[agence] || {})) {
+      const rows = old[agence][mois];
+      if (!rows || !rows.length) continue;
+      try {
+        const check = await fetch(
+          "/api/sheet?agence=" + encodeURIComponent(agence) + "&mois=" + encodeURIComponent(mois)
+        );
+        if (check.ok) {
+          // Une version existe déjà côté serveur (créée par quelqu'un d'autre
+          // ou par toi juste après la mise à jour) : on ne l'écrase pas.
+          skipped++;
+          continue;
+        }
+        await fetch(
+          "/api/sheet?agence=" + encodeURIComponent(agence) + "&mois=" + encodeURIComponent(mois),
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ rows: rows }),
+          }
+        );
+        imported++;
+      } catch (e) { skipped++; }
+    }
+  }
+
+  localStorage.setItem(STORE_KEY + "_importe_le", new Date().toISOString());
+  localStorage.removeItem(STORE_KEY);
+  document.getElementById("importBanner").style.display = "none";
+  store = {}; // vide le cache mémoire pour forcer un rechargement depuis le serveur
+  await switchSheet(curAgence, curMois);
+
+  let msg = imported + " feuille(s) importée(s).";
+  if (skipped) msg += " " + skipped + " déjà présente(s) côté serveur (non écrasée(s) — vérifie-les si besoin).";
+  alert(msg);
+}
+
+function initImportBanner() {
+  const old = getOldLocalStore();
+  const banner = document.getElementById("importBanner");
+  if (!old || !banner) return;
+  banner.style.display = "flex";
+  document.getElementById("importOldData").addEventListener("click", importOldLocalStore);
+  document.getElementById("dismissImport").addEventListener("click", () => {
+    banner.style.display = "none";
+  });
+}
+
 initControls();
 initRowHighlight();
+initImportBanner();
 renderTabs();
 switchSheet(curAgence, curMois);
 </script>
