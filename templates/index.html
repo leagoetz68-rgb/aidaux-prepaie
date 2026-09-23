@@ -733,8 +733,18 @@ function render() {
     (curTab === "prepaie") ? "" : "none";
 
   const tbody = document.getElementById("tbody");
+
+  // Garde une trace du champ actif (et de la position du curseur) pour ne
+  // pas perturber une saisie en cours, même si le tri déplace la ligne.
+  const active = document.activeElement;
+  const activeCellKey = (active && active.dataset) ? active.dataset.cellKey : null;
+  const activeSelStart = (active && active.selectionStart != null) ? active.selectionStart : null;
+
   tbody.innerHTML = "";
   const rows = getSheet(curAgence, curMois);
+  if (curTab === "prepaie") {
+    rows.sort((a, b) => (a.nom || "").localeCompare(b.nom || "", "fr", { sensitivity: "base" }));
+  }
 
   rows.forEach((row, ri) => {
     if (!row._hl) row._hl = {};
@@ -846,29 +856,18 @@ function render() {
   });
 
   document.getElementById("statCount").textContent = rows.length;
+
+  if (activeCellKey) {
+    const el = document.querySelector('[data-cell-key="' + activeCellKey.replace(/"/g, '\\"') + '"]');
+    if (el && el !== document.activeElement) {
+      el.focus();
+      if (activeSelStart != null && el.setSelectionRange) { try { el.setSelectionRange(activeSelStart, activeSelStart); } catch (e) {} }
+    }
+  }
 }
 
 function sortRowsNow() {
-  const rows = getSheet(curAgence, curMois);
-  const active = document.activeElement;
-  const cellKey = (active && active.dataset) ? active.dataset.cellKey : null;
-  const selStart = (active && active.selectionStart != null) ? active.selectionStart : null;
-
-  const before = rows.slice();
-  rows.sort((a, b) => (a.nom || "").localeCompare(b.nom || "", "fr", { sensitivity: "base" }));
-  const changed = rows.some((r, i) => r !== before[i]);
-  if (!changed) return;
-
-  saveStore();
-  render();
-
-  if (cellKey) {
-    const el = document.querySelector('[data-cell-key="' + cellKey.replace(/"/g, '\\"') + '"]');
-    if (el) {
-      el.focus();
-      if (selStart != null && el.setSelectionRange) { try { el.setSelectionRange(selStart, selStart); } catch (e) {} }
-    }
-  }
+  render(); // render() trie déjà systématiquement et restaure le focus
 }
 
 let sortTimer = null;
