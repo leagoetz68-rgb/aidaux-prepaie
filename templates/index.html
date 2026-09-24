@@ -282,6 +282,9 @@
   td.hl-teal   input { background: var(--teal);   color:#fff; font-weight: 700; border-radius: 6px; }
   td.hl-orange input { background: var(--orange); color:#fff; font-weight: 700; border-radius: 6px; }
   td.hl-navy   input { background: var(--navy);   color:#fff; font-weight: 700; border-radius: 6px; }
+  /* Case grise = ne prend pas les transports / pas de véhicule / pas d'avantage */
+  td.hl-grey { background: #9a9a9a; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  td.hl-grey input { background: #9a9a9a; color:#fff; font-weight: 600; border-radius: 6px; }
   /* un champ désactivé ne doit pas bloquer le double-clic sur la cellule */
   tbody input:disabled { pointer-events: none; }
   td.hl-teal input::placeholder,
@@ -386,6 +389,7 @@
 
     <div class="legend" id="legend">
       <span><i class="swatch" style="background:#f0f3f6"></i> « dès MM/AA » = ouverture après la période d'essai</span>
+      <span><i class="swatch" style="background:#9a9a9a"></i> case grise = ne prend pas les transports / pas de véhicule (pas de frais km)</span>
       <span class="hint">Ticket resto : déblocage auto après 2 mois d'essai. Double-cliquez la case pour la marquer « NON » (ne bénéficie pas).</span>
     </div>
 
@@ -443,7 +447,7 @@ function tabColumns() {
 }
 
 // cycle des couleurs au double-clic (couleurs AID'AUX)
-const HL = ["", "hl-teal", "hl-orange", "hl-navy"];
+const HL = ["", "hl-teal", "hl-orange", "hl-navy", "hl-grey"];
 const TICKET_MARKS = ["hl-orange", "hl-navy"]; // = « ne bénéficie pas »
 
 // ---- Agences & effectifs de départ ----
@@ -506,6 +510,214 @@ const AGENCES = {
     ],
   },
 };
+
+// ---- Cases grises reprises des fichiers Excel de paie (Août & Septembre 2026) ----
+// Case grise = le salarié ne prend pas les transports / n'a pas de véhicule
+// (donc pas de frais km) / pas d'avantage nature. Reprises à l'identique des
+// fichiers Excel, uniquement pour les salariés qui existent déjà dans la
+// feuille : aucun salarié n'est ajouté. Une fois posées, on peut les
+// enlever/remettre au double-clic comme les autres couleurs.
+const GRISES = {
+  "cronenbourg": {
+    "Août 2026": {
+      "Acker Tatiana": ["avNature"],
+      "Akhonzada Abduljabar": ["forfaitKm", "kmsPdt", "avNature"],
+      "Amiri Saiedeh": ["forfaitKm", "kmsPdt", "avNature"],
+      "Bakemba Prisca": ["forfaitKm", "kmsPdt", "avNature"],
+      "Blanchet Yoann": ["forfaitKm", "avNature"],
+      "Bonnet Solange": ["forfaitKm", "avNature"],
+      "Bouzagloui Nadia": ["forfaitKm", "avNature"],
+      "Broladze Mariami": ["forfaitKm", "kmsPdt", "avNature"],
+      "Cadoni Laura": ["titreTr", "avNature"],
+      "Deutsch Maëva": ["titreTr", "avNature"],
+      "Diaboungana, Sylvie": ["forfaitKm", "kmsPdt", "avNature"],
+      "Diadhiou Chantal": ["forfaitKm", "kmsPdt", "avNature"],
+      "Diallo Djeinabou": ["titreTr", "forfaitKm", "kmsPdt"],
+      "Dietrich, Aurore": ["forfaitKm", "kmsPdt", "avNature"],
+      "Dingeldein, Prescilla": ["avNature"],
+      "Dix Annie": ["forfaitKm", "kmsPdt", "avNature"],
+      "Donati Anastasia": ["forfaitKm", "avNature"],
+      "Duchene Monique": ["forfaitKm", "kmsPdt", "avNature"],
+      "El Aydi Asmae": ["forfaitKm", "kmsPdt", "avNature"],
+      "Fischer Léa": ["titreTr", "avNature"],
+      "Gauthier, Lucie": ["forfaitKm", "kmsPdt", "avNature"],
+      "Glaess Rajaa": ["titreTr", "forfaitKm", "avNature"],
+      "Hend Ibtissem": ["titreTr", "avNature"],
+      "Hohnadel Déborah": ["titreTr", "forfaitKm", "kmsPdt", "avNature"],
+      "Junieres Laure": ["forfaitKm", "kmsPdt", "avNature"],
+      "Kamiza Tamatafika": ["forfaitKm", "kmsPdt", "avNature"],
+      "Khedir, Khadija": ["forfaitKm", "kmsPdt", "avNature"],
+      "Kokhtashvili Ekaterine": ["forfaitKm", "kmsPdt", "avNature"],
+      "Kurilko Tetiana": ["forfaitKm", "kmsPdt", "avNature"],
+      "Le Guen Laura": ["titreTr", "forfaitKm", "kmsPdt"],
+      "Leonhart Kalina": ["titreTr", "avNature"],
+      "Mansoor Sodaba": ["forfaitKm", "kmsPdt", "avNature"],
+      "Marlier Sandra": ["forfaitKm", "kmsPdt", "avNature"],
+      "Maurice Alain": ["titreTr", "forfaitKm", "avNature"],
+      "Mayetela Evelyne": ["titreTr", "avNature"],
+      "Mugisha Yannick": ["forfaitKm", "kmsPdt", "avNature"],
+      "Naman Omar": ["forfaitKm", "kmsPdt", "avNature"],
+      "Neyra-Prado, Rosa": ["forfaitKm", "kmsPdt", "avNature"],
+      "Nivet, Sylvie": ["titreTr", "avNature"],
+      "Njezi Linda": ["titreTr", "forfaitKm", "avNature"],
+      "Nohovitsyna Irina": ["forfaitKm", "kmsPdt", "avNature"],
+      "Nsabimana Gérard": ["forfaitKm", "kmsPdt", "avNature"],
+      "Pain John": ["titreTr", "avNature"],
+      "Papikyan Anna": ["forfaitKm", "kmsPdt", "avNature"],
+      "Pfister Prescilla": ["forfaitKm", "kmsPdt", "avNature"],
+      "Rohrbacher Jennifer": ["titreTr", "forfaitKm", "kmsPdt", "avNature"],
+      "Rosca Eléna": ["forfaitKm", "kmsPdt", "avNature"],
+      "Saddouki Saliha": ["titreTr", "forfaitKm", "avNature"],
+      "Seewald Jean-Jacques": ["titreTr", "avNature"],
+      "Smoki Nadia": ["forfaitKm", "avNature"],
+      "Smolarczuk Izabela": ["forfaitKm", "kmsPdt", "avNature"],
+      "Tchouate Tankoua Prisca": ["titreTr", "forfaitKm", "avNature"],
+      "Ture Fatou": ["forfaitKm", "kmsPdt", "avNature"],
+      "Zarcos Jessica": ["titreTr", "kmsPdt", "avNature"],
+    },
+    "Septembre 2026": {
+      "Acker Tatiana": ["avNature"],
+      "Akhonzada Abduljabar": ["forfaitKm", "kmsPdt", "avNature"],
+      "Amiri Saiedeh": ["forfaitKm", "kmsPdt", "avNature"],
+      "Bakemba Prisca": ["forfaitKm", "kmsPdt", "avNature"],
+      "Blanchet Yoann": ["forfaitKm", "avNature"],
+      "Bonnet Solange": ["forfaitKm", "avNature"],
+      "Bouzagloui Nadia": ["forfaitKm", "avNature"],
+      "Broladze Mariami": ["forfaitKm", "kmsPdt", "avNature"],
+      "Cadoni Laura": ["titreTr", "avNature"],
+      "Deutsch Maëva": ["titreTr", "avNature"],
+      "Diaboungana, Sylvie": ["forfaitKm", "kmsPdt", "avNature"],
+      "Diadhiou Chantal": ["forfaitKm", "kmsPdt", "avNature"],
+      "Diallo Djeinabou": ["titreTr", "forfaitKm", "kmsPdt"],
+      "Dietrich, Aurore": ["forfaitKm", "kmsPdt", "avNature"],
+      "Dingeldein, Prescilla": ["avNature"],
+      "Dix Annie": ["forfaitKm", "kmsPdt", "avNature"],
+      "Donati Anastasia": ["forfaitKm", "avNature"],
+      "Duchene Monique": ["forfaitKm", "kmsPdt", "avNature"],
+      "El Aydi Asmae": ["forfaitKm", "kmsPdt", "avNature"],
+      "Fischer Léa": ["titreTr", "avNature"],
+      "Gauthier, Lucie": ["forfaitKm", "kmsPdt", "avNature"],
+      "Glaess Rajaa": ["titreTr", "forfaitKm", "avNature"],
+      "Hend Ibtissem": ["titreTr", "avNature"],
+      "Hohnadel Déborah": ["titreTr", "forfaitKm", "kmsPdt", "avNature"],
+      "Junieres Laure": ["forfaitKm", "kmsPdt", "avNature"],
+      "Kamiza Tamatafika": ["forfaitKm", "kmsPdt", "avNature"],
+      "Khedir, Khadija": ["forfaitKm", "kmsPdt", "avNature"],
+      "Kokhtashvili Ekaterine": ["forfaitKm", "kmsPdt", "avNature"],
+      "Kurilko Tetiana": ["forfaitKm", "kmsPdt", "avNature"],
+      "Le Guen Laura": ["titreTr", "forfaitKm", "kmsPdt"],
+      "Leonhart Kalina": ["titreTr", "avNature"],
+      "Mansoor Sodaba": ["forfaitKm", "kmsPdt", "avNature"],
+      "Marlier Sandra": ["forfaitKm", "kmsPdt", "avNature"],
+      "Maurice Alain": ["titreTr", "forfaitKm", "avNature"],
+      "Mayetela Evelyne": ["titreTr", "avNature"],
+      "Mugisha Yannick": ["forfaitKm", "kmsPdt", "avNature"],
+      "Naman Omar": ["forfaitKm", "kmsPdt", "avNature"],
+      "Neyra-Prado, Rosa": ["forfaitKm", "kmsPdt", "avNature"],
+      "Nivet, Sylvie": ["titreTr", "avNature"],
+      "Njezi Linda": ["titreTr", "forfaitKm", "avNature"],
+      "Nohovitsyna Irina": ["forfaitKm", "kmsPdt", "avNature"],
+      "Nsabimana Gérard": ["forfaitKm", "kmsPdt", "avNature"],
+      "Pain John": ["titreTr", "avNature"],
+      "Papikyan Anna": ["forfaitKm", "kmsPdt", "avNature"],
+      "Pfister Prescilla": ["forfaitKm", "kmsPdt", "avNature"],
+      "Rohrbacher Jennifer": ["titreTr", "forfaitKm", "kmsPdt", "avNature"],
+      "Rosca Eléna": ["forfaitKm", "kmsPdt", "avNature"],
+      "Saddouki Saliha": ["titreTr", "forfaitKm", "avNature"],
+      "Seewald Jean-Jacques": ["titreTr", "avNature"],
+      "Smoki Nadia": ["forfaitKm", "avNature"],
+      "Smolarczuk Izabela": ["forfaitKm", "kmsPdt", "avNature"],
+      "Tchouate Tankoua Prisca": ["titreTr", "forfaitKm", "avNature"],
+      "Ture Fatou": ["forfaitKm", "kmsPdt", "avNature"],
+      "Zarcos Jessica": ["titreTr", "kmsPdt", "avNature"],
+    },
+  },
+  "administratif": {
+    "Août 2026": {
+      "Soulliez Jennifer": ["forfaitKm", "kmsPdt"],
+      "Mischel Marie": ["titreTr", "forfaitKm", "kmsPdt"],
+      "Suplon Tatiana": ["titreTr", "forfaitKm", "kmsPdt", "avNature"],
+      "Goetz Léa": ["forfaitKm", "kmsPdt", "avNature"],
+    },
+    "Septembre 2026": {
+      "Soulliez Jennifer": ["forfaitKm", "kmsPdt"],
+      "Mischel Marie": ["titreTr", "forfaitKm", "kmsPdt"],
+      "Suplon Tatiana": ["titreTr", "forfaitKm", "kmsPdt", "avNature"],
+      "Goetz Léa": ["forfaitKm", "kmsPdt", "avNature"],
+    },
+  },
+  "vendenheim": {
+    "Août 2026": {
+      "ABOUDA Habiba": ["titreTr"],
+      "BELHEDI Anissa": ["titreTr"],
+      "BILOMBA Séraphine": ["forfaitKm"],
+      "BORAS Ouassila": ["titreTr"],
+      "CAVILLIER Lova": ["titreTr", "forfaitKm"],
+      "CHATILLON Aurélie": ["titreTr"],
+      "DEL MINCHONI Victor": ["titreTr"],
+      "ERDOGAN Gulizar": ["titreTr"],
+      "GRIESBACH Muriel": ["titreTr"],
+      "HOUSSEIN WABERI Kadra": ["titreTr"],
+      "IVANIASHVILI Nino": ["forfaitKm"],
+      "KALT Coralyne": ["forfaitKm"],
+      "KONDZIELA Cassandra": ["forfaitKm"],
+      "LEMAITRE Emmanuelle": ["titreTr"],
+      "MATT Claudia": ["forfaitKm"],
+      "NEUBURGER Laura": ["titreTr"],
+      "ONIMUS Claire": ["titreTr"],
+      "RAUSER Sony": ["forfaitKm"],
+      "RINK Aurélie": ["forfaitKm"],
+      "TEKIN Dilek": ["titreTr"],
+      "WEBER Angèle": ["titreTr"],
+      "WELSCH Andréia": ["titreTr"],
+    },
+    "Septembre 2026": {
+      "ABOUDA Habiba": ["titreTr"],
+      "BILOMBA Séraphine": ["forfaitKm"],
+      "BORAS Ouassila": ["titreTr"],
+      "CAVILLIER Lova": ["titreTr", "forfaitKm"],
+      "CHATILLON Aurélie": ["titreTr"],
+      "DEL MINCHONI Victor": ["titreTr"],
+      "ERDOGAN Gulizar": ["titreTr"],
+      "GRIESBACH Muriel": ["titreTr"],
+      "HOUSSEIN WABERI Kadra": ["titreTr"],
+      "KALT Coralyne": ["forfaitKm"],
+      "KONDZIELA Cassandra": ["forfaitKm"],
+      "MATT Claudia": ["forfaitKm"],
+      "NEUBURGER Laura": ["titreTr"],
+      "ONIMUS Claire": ["titreTr"],
+      "RAUSER Sony": ["forfaitKm"],
+      "RINK Aurélie": ["forfaitKm"],
+      "TEKIN Dilek": ["titreTr"],
+      "WEBER Angèle": ["titreTr"],
+      "WELSCH Andréia": ["titreTr"],
+    },
+  },
+};
+function normNom(s) {
+  return String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase().replace(/,/g, " ").replace(/\s+/g, " ").trim();
+}
+// Pose les cases grises sur les salariés présents. Chaque ligne n'est traitée
+// qu'une fois (marqueur _gris) : si on enlève une case grise à la main, elle
+// ne revient pas au rechargement. Ne touche jamais une case déjà colorée.
+function appliquerGrises(agence, mois, rows) {
+  const src = (GRISES[agence] || {})[mois];
+  if (!src) return false;
+  const parNom = {};
+  Object.keys(src).forEach(n => { parNom[normNom(n)] = src[n]; });
+  let modif = false;
+  rows.forEach(r => {
+    if (r._gris) return;
+    const keys = parNom[normNom(r.nom)];
+    if (!keys) return;
+    if (!r._hl) r._hl = {};
+    keys.forEach(k => { if (!r._hl[k]) r._hl[k] = "hl-grey"; });
+    r._gris = true;
+    modif = true;
+  });
+  return modif;
+}
 
 // ---- Mois disponibles ----
 const MOIS = [
@@ -603,6 +815,8 @@ async function ensureSheetLoaded(agence, mois) {
       if (data.rows) {
         data.rows.forEach(r => { if (!r._id) r._id = uid(); });
         store[agence][mois] = data.rows;
+        // feuille existante : on pose les cases grises et on enregistre
+        if (appliquerGrises(agence, mois, data.rows)) pushSheet(agence, mois);
         return;
       }
     }
@@ -611,6 +825,9 @@ async function ensureSheetLoaded(agence, mois) {
   // mémoire seulement (on n'écrit rien tant que personne n'a rien tapé,
   // pour ne jamais bloquer un futur import de vraies données).
   store[agence][mois] = AGENCES[agence].salaries.map(s => emptyRow(s));
+  // feuille pas encore créée : cases grises en mémoire seulement (elles
+  // seront enregistrées avec la première saisie)
+  appliquerGrises(agence, mois, store[agence][mois]);
 }
 
 // Bascule l'agence/le mois affiché : charge la feuille depuis le serveur
