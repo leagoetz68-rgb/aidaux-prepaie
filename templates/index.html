@@ -420,13 +420,13 @@ const TABS = [
       { key: "contrat",     label: "Contrat" },
       { key: "avenant",     label: "Avenant",           sub: "nouveau contrat (h)" },
       { key: "typeContrat", label: "CDI/CDD", type: "cdicdd" },
-      { key: "trNbre",      label: "Ticket resto",      sub: "Nbre — déblocage auto", type: "ticket" },
-      { key: "titreTr",     label: "Titre de transport" },
+      { key: "trNbre",      label: "Ticket resto",      thLabel: "Ticket<br>resto", sub: "nbre", type: "ticket", minWidth: 50 },
+      { key: "titreTr",     label: "Titre de transport", thLabel: "Titre de<br>transport", minWidth: 50 },
       { key: "forfaitKm",   label: "Forfait KMS" },
       { key: "kmsPdt",      label: "KMS PDT" },
       { key: "avNature",    label: "Avantage nature" },
       { key: "acompte",     label: "Acompte" },
-      { key: "divers",      label: "Divers", minWidth: 260 },
+      { key: "divers",      label: "Divers", minWidth: 480, left: true },
     ],
   },
   {
@@ -934,7 +934,7 @@ function renderHead(cols) {
     const th = document.createElement("th");
     if (col.type === "name") th.className = "hname";
     if (col.type === "ticket") th.className = "group";
-    th.innerHTML = col.label + (col.sub ? '<br><span class="th-sub">' + col.sub + '</span>' : "");
+    th.innerHTML = (col.thLabel || col.label) + (col.sub ? '<br><span class="th-sub">' + col.sub + '</span>' : "");
     tr.appendChild(th);
   });
   const thDel = document.createElement("th");
@@ -1027,6 +1027,7 @@ function render() {
         inp.addEventListener("keydown", (e) => { if (e.key === "Enter") inp.blur(); });
       }
       if (col.minWidth) inp.style.minWidth = col.minWidth + "px";
+      if (col.left) inp.style.textAlign = "left";
       // double-clic = change la couleur de fond de la cellule
       td.addEventListener("dblclick", (e) => {
         if (col.type === "name") return;
