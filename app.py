@@ -36,12 +36,52 @@ def init_sheets_db():
                 )
                 """
             )
+            # Mois ajoutés au fur et à mesure depuis l'interface
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS prepaie_mois (
+                    mois TEXT PRIMARY KEY,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+                )
+                """
+            )
         conn.commit()
     finally:
         conn.close()
 
 
 init_sheets_db()
+
+
+@app.route("/api/mois", methods=["GET"])
+def api_get_mois():
+    conn = auth._conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT mois FROM prepaie_mois")
+            rows = cur.fetchall()
+    finally:
+        conn.close()
+    return jsonify({"mois": [r[0] for r in rows]})
+
+
+@app.route("/api/mois", methods=["POST"])
+def api_add_mois():
+    body = request.get_json(silent=True) or {}
+    mois = (body.get("mois") or "").strip()
+    if not mois:
+        return jsonify({"ok": False}), 400
+    conn = auth._conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO prepaie_mois (mois) VALUES (%s) ON CONFLICT DO NOTHING",
+                (mois,),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+    return jsonify({"ok": True})
 
 
 @app.route("/api/sheet", methods=["GET"])
