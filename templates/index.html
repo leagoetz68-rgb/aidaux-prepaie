@@ -368,6 +368,7 @@
         <label for="mois">Mois</label>
         <div class="select-wrap"><select id="mois"></select></div>
       </div>
+      <button class="btn ghost" id="addMois" title="Ajouter le mois suivant">＋ Mois suivant</button>
       <div class="spacer"></div>
       <button class="btn ghost" id="addRow2">＋ Ajouter un salarié</button>
       <button class="btn secondary" id="exportCsv">⬇ Export CSV</button>
@@ -721,7 +722,7 @@ function appliquerGrises(agence, mois, rows) {
 
 // ---- Mois disponibles ----
 const MOIS = [
-  "Septembre 2026","Août 2026","Juillet 2026","Juin 2026","Mai 2026","Avril 2026",
+  "Novembre 2026","Octobre 2026","Septembre 2026","Août 2026","Juillet 2026","Juin 2026","Mai 2026","Avril 2026",
   "Mars 2026","Février 2026","Janvier 2026","Décembre 2025","Novembre 2025",
   "Octobre 2025","Septembre 2025","Août 2025","Juillet 2025","Juin 2025"
 ];
@@ -1161,14 +1162,10 @@ function initControls() {
   selA.addEventListener("change", () => { switchSheet(selA.value, curMois); });
 
   const selM = document.getElementById("mois");
-  MOIS.forEach(m => {
-    const o = document.createElement("option");
-    o.value = m; o.textContent = m;
-    selM.appendChild(o);
-  });
-  selM.value = curMois;
+  remplirMois();
   selM.addEventListener("change", () => { switchSheet(curAgence, selM.value); });
 
+  document.getElementById("addMois").addEventListener("click", ajouterMoisSuivant);
   document.getElementById("addRow2").addEventListener("click", addRow);
   document.getElementById("exportCsv").addEventListener("click", exportCsv);
   document.getElementById("printBtn").addEventListener("click", () => window.print());
@@ -1240,7 +1237,54 @@ function initImportBanner() {
   });
 }
 
+// ---- Ajout des mois au fur et à mesure (stockés côté serveur) ----
+function moisIndex(m) { const p = parseMois(m); return p ? p.y * 12 + p.m : -1; }
+function nomMois(idx) {
+  const n = FR_MONTH_NAMES[idx % 12];
+  return n.charAt(0).toUpperCase() + n.slice(1) + " " + Math.floor(idx / 12);
+}
+function trierMois() { MOIS.sort((a, b) => moisIndex(b) - moisIndex(a)); }
+function remplirMois() {
+  const selM = document.getElementById("mois");
+  selM.innerHTML = "";
+  MOIS.forEach(m => {
+    const o = document.createElement("option");
+    o.value = m; o.textContent = m;
+    selM.appendChild(o);
+  });
+  selM.value = curMois;
+}
+async function chargerMoisServeur() {
+  try {
+    const res = await fetch("/api/mois", { credentials: "same-origin" });
+    if (!res.ok) return;
+    const data = await res.json();
+    (data.mois || []).forEach(m => { if (!MOIS.includes(m)) MOIS.push(m); });
+    trierMois();
+    remplirMois();
+  } catch (e) { /* pas bloquant */ }
+}
+async function ajouterMoisSuivant() {
+  trierMois();
+  const nouveau = nomMois(moisIndex(MOIS[0]) + 1);
+  if (!confirm("Ajouter le mois « " + nouveau + " » ?")) return;
+  try {
+    const res = await fetch("/api/mois", {
+      method: "POST", credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mois: nouveau })
+    });
+    if (!res.ok) throw new Error();
+  } catch (e) { alert("Impossible d'ajouter le mois, réessaie."); return; }
+  if (!MOIS.includes(nouveau)) MOIS.push(nouveau);
+  trierMois();
+  curMois = nouveau;
+  remplirMois();
+  switchSheet(curAgence, nouveau);
+}
+
 initControls();
+chargerMoisServeur();
 initRowHighlight();
 initImportBanner();
 renderTabs();
