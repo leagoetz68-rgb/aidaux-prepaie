@@ -342,6 +342,9 @@
     .table-wrap { box-shadow: none; border: none; }
     .topbar { background: #101a6b !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   }
+.cdicdd{display:flex;gap:10px;justify-content:center;align-items:center;padding:4px 6px;font-size:12px;white-space:nowrap}
+.cdicdd label{display:flex;align-items:center;gap:3px;cursor:pointer}
+.cdicdd input{width:auto;margin:0;cursor:pointer}
 </style>
 </head>
 <body>
@@ -414,7 +417,7 @@ const TABS = [
       { key: "embauche",    label: "Date d'embauche" },
       { key: "contrat",     label: "Contrat" },
       { key: "avenant",     label: "Avenant",           sub: "nouveau contrat (h)" },
-      { key: "avenantDate", label: "Date de signature", sub: "de l'avenant (jj/mm/aaaa)" },
+      { key: "typeContrat", label: "CDI / CDD",         sub: "type de l'avenant", type: "cdicdd" },
       { key: "trNbre",      label: "Ticket resto",      sub: "Nbre — déblocage auto", type: "ticket" },
       { key: "titreTr",     label: "Titre de transport" },
       { key: "forfaitKm",   label: "Forfait KMS" },
@@ -985,6 +988,29 @@ function render() {
 
       // cycle de couleurs propre à chaque type de colonne
       const cycle = (col.type === "ticket") ? ["", "hl-orange", "hl-navy"] : HL;
+
+      // CDI / CDD : deux cases à cocher, une seule active à la fois
+      if (col.type === "cdicdd") {
+        const box = document.createElement("div");
+        box.className = "cdicdd";
+        ["CDI", "CDD"].forEach(v => {
+          const lab = document.createElement("label");
+          const cb = document.createElement("input");
+          cb.type = "checkbox";
+          cb.checked = row[col.key] === v;
+          cb.addEventListener("change", () => {
+            row[col.key] = cb.checked ? v : "";
+            saveStore();
+            render();
+          });
+          lab.appendChild(cb);
+          lab.appendChild(document.createTextNode(" " + v));
+          box.appendChild(lab);
+        });
+        td.appendChild(box);
+        tr.appendChild(td);
+        return;
+      }
 
       const inp = document.createElement("input");
       inp.type = "text";
