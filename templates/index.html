@@ -342,9 +342,10 @@
     .table-wrap { box-shadow: none; border: none; }
     .topbar { background: #101a6b !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   }
-.cdicdd{display:flex;gap:10px;justify-content:center;align-items:center;padding:4px 6px;font-size:12px;white-space:nowrap}
-.cdicdd label{display:flex;align-items:center;gap:3px;cursor:pointer}
-.cdicdd input{width:auto;margin:0;cursor:pointer}
+tbody td.cdicdd-td{padding:0 4px;width:1%;white-space:nowrap}
+.cdicdd{display:flex;flex-direction:column;align-items:flex-start;gap:1px;font-size:10px;line-height:1.1;color:#4a5a6a}
+.cdicdd label{display:flex;align-items:center;gap:2px;cursor:pointer}
+tbody .cdicdd input{width:11px;height:11px;min-width:0;padding:0;margin:0;border:0;cursor:pointer}
 </style>
 </head>
 <body>
@@ -417,7 +418,7 @@ const TABS = [
       { key: "embauche",    label: "Date d'embauche" },
       { key: "contrat",     label: "Contrat" },
       { key: "avenant",     label: "Avenant",           sub: "nouveau contrat (h)" },
-      { key: "typeContrat", label: "CDI / CDD",         sub: "type de l'avenant", type: "cdicdd" },
+      { key: "typeContrat", label: "CDI/CDD", type: "cdicdd" },
       { key: "trNbre",      label: "Ticket resto",      sub: "Nbre — déblocage auto", type: "ticket" },
       { key: "titreTr",     label: "Titre de transport" },
       { key: "forfaitKm",   label: "Forfait KMS" },
@@ -993,6 +994,7 @@ function render() {
       if (col.type === "cdicdd") {
         const box = document.createElement("div");
         box.className = "cdicdd";
+        td.classList.add("cdicdd-td");
         ["CDI", "CDD"].forEach(v => {
           const lab = document.createElement("label");
           const cb = document.createElement("input");
@@ -1004,7 +1006,7 @@ function render() {
             render();
           });
           lab.appendChild(cb);
-          lab.appendChild(document.createTextNode(" " + v));
+          lab.appendChild(document.createTextNode(v));
           box.appendChild(lab);
         });
         td.appendChild(box);
