@@ -282,6 +282,9 @@
   td.hl-teal   input { background: var(--teal);   color:#fff; font-weight: 700; border-radius: 6px; }
   td.hl-orange input { background: var(--orange); color:#fff; font-weight: 700; border-radius: 6px; }
   td.hl-navy   input { background: var(--navy);   color:#fff; font-weight: 700; border-radius: 6px; }
+  /* surligneur vert (toutes les cases sauf Ticket resto) */
+  td.hl-green { background: #b7f5a0 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  td.hl-green input { background: #b7f5a0 !important; color: var(--text); font-weight: 600; border-radius: 6px; }
   /* Case grise = ne prend pas les transports / pas de véhicule / pas d'avantage */
   td.hl-grey { background: #9a9a9a; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   td.hl-grey input { background: #9a9a9a; color:#fff; font-weight: 600; border-radius: 6px; }
@@ -395,7 +398,7 @@ tbody td.cdicdd-td{padding:0 8px;width:1%;white-space:nowrap;text-align:center}
 
     <div class="legend" id="legend">
       <span><i class="swatch" style="background:#f0f3f6"></i> « dès MM/AA » = ouverture après la période d'essai</span>
-      <span><i class="swatch" style="background:#9a9a9a"></i> case grise = ne prend pas les transports / pas de véhicule (pas de frais km)</span>
+      <span><i class="swatch" style="background:#b7f5a0"></i> double-clic sur une case = surligner en vert</span>
       <span class="hint">Ticket resto : déblocage auto après 2 mois d'essai. Double-cliquez la case pour la marquer « NON » (ne bénéficie pas).</span>
     </div>
 
@@ -453,7 +456,7 @@ function tabColumns() {
 }
 
 // cycle des couleurs au double-clic (couleurs AID'AUX)
-const HL = ["", "hl-teal", "hl-orange", "hl-navy", "hl-grey"];
+const HL = ["", "hl-teal", "hl-orange", "hl-navy", "hl-grey", "hl-green"];
 const TICKET_MARKS = ["hl-orange", "hl-navy"]; // = « ne bénéficie pas »
 
 // ---- Agences & effectifs de départ ----
@@ -985,11 +988,13 @@ function render() {
         row._hl[col.key] = "";
         saveStore();
       }
-      const hl = row._hl[col.key];
+      let hl = row._hl[col.key];
+      // hors Ticket resto : une seule couleur, le vert surligneur
+      if (hl && col.type !== "ticket") hl = "hl-green";
       if (hl) td.classList.add(hl);
 
       // cycle de couleurs propre à chaque type de colonne
-      const cycle = (col.type === "ticket") ? ["", "hl-orange", "hl-navy"] : HL;
+      const cycle = (col.type === "ticket") ? ["", "hl-orange", "hl-navy"] : ["", "hl-green"];
 
       // CDI / CDD : deux cases à cocher, une seule active à la fois
       if (col.type === "cdicdd") {
@@ -1030,13 +1035,13 @@ function render() {
       if (col.left) inp.style.textAlign = "left";
       // double-clic = change la couleur de fond de la cellule
       td.addEventListener("dblclick", (e) => {
-        if (col.type === "name") return;
-        const cur = row._hl[col.key] || "";
+        const cur = hl || "";
         const idx = cycle.indexOf(cur);
         const next = cycle[((idx < 0 ? 0 : idx) + 1) % cycle.length];
         HL.forEach(h => h && td.classList.remove(h));
         if (next) td.classList.add(next);
         row._hl[col.key] = next;
+        hl = next;
         saveStore();
         if (col.type === "ticket") render(); // réapplique le statut de la case
       });
