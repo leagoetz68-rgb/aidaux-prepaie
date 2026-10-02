@@ -342,10 +342,11 @@
     .table-wrap { box-shadow: none; border: none; }
     .topbar { background: #101a6b !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   }
-tbody td.cdicdd-td{padding:0 4px;width:1%;white-space:nowrap}
-.cdicdd{display:flex;flex-direction:column;align-items:flex-start;gap:1px;font-size:10px;line-height:1.1;color:#4a5a6a}
-.cdicdd label{display:flex;align-items:center;gap:2px;cursor:pointer}
-tbody .cdicdd input{width:11px;height:11px;min-width:0;padding:0;margin:0;border:0;cursor:pointer}
+tbody td.cdicdd-td{padding:0 8px;width:1%;white-space:nowrap;text-align:center}
+.cdicdd{display:inline-flex;gap:4px}
+.cdicdd button{font:inherit;font-size:11px;font-weight:700;padding:3px 8px;border-radius:999px;border:1px solid #cfd9e2;background:#fff;color:#8a99a8;cursor:pointer;transition:all .15s}
+.cdicdd button:hover{border-color:var(--teal);color:var(--teal-dark)}
+.cdicdd button.on{background:var(--teal);border-color:var(--teal);color:#fff}
 </style>
 </head>
 <body>
@@ -996,18 +997,16 @@ function render() {
         box.className = "cdicdd";
         td.classList.add("cdicdd-td");
         ["CDI", "CDD"].forEach(v => {
-          const lab = document.createElement("label");
-          const cb = document.createElement("input");
-          cb.type = "checkbox";
-          cb.checked = row[col.key] === v;
-          cb.addEventListener("change", () => {
-            row[col.key] = cb.checked ? v : "";
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.textContent = v;
+          if (row[col.key] === v) btn.classList.add("on");
+          btn.addEventListener("click", () => {
+            row[col.key] = row[col.key] === v ? "" : v;
             saveStore();
             render();
           });
-          lab.appendChild(cb);
-          lab.appendChild(document.createTextNode(v));
-          box.appendChild(lab);
+          box.appendChild(btn);
         });
         td.appendChild(box);
         tr.appendChild(td);
