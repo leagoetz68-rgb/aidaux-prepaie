@@ -817,7 +817,37 @@ document.addEventListener("visibilitychange", () => {
 window.addEventListener("pagehide", flushPendingSaveNow);
 window.addEventListener("beforeunload", flushPendingSaveNow);
 
-async function ensureSheetLoaded(agence, mois) {
+// ---- Reprise des « NON » Ticket resto d'un mois sur l'autre ----
+// Pour chaque salarié, si sa case Ticket resto était « NON » le mois d'avant
+// (même nom), on la remet en « NON ». Chaque ligne n'est traitée qu'une fois
+// (marqueur _nonRepris) : si on enlève le NON à la main, il ne revient pas.
+const nomCle = n => String(n || "").trim().toLowerCase().replace(/\s+/g, " ");
+async function reprendreNon(agence, mois, rows, depth) {
+  const idx = moisIndex(mois);
+  // les mois jusqu'à septembre 2026 sont déjà remplis : on n'y touche pas
+  if (idx < 0 || idx < moisIndex("Octobre 2026") || depth > 12) return false;
+  const prev = nomMois(idx - 1);
+  await ensureSheetLoaded(agence, prev, depth + 1);
+  const prevRows = (store[agence] || {})[prev] || [];
+  const nonPrec = {};
+  prevRows.forEach(r => {
+    const m = r._hl && r._hl.trNbre;
+    if (TICKET_MARKS.indexOf(m) >= 0) nonPrec[nomCle(r.nom)] = m;
+  });
+  let change = false;
+  rows.forEach(r => {
+    if (r._nonRepris) return;
+    if (!r._hl) r._hl = {};
+    const m = nonPrec[nomCle(r.nom)];
+    if (m && !r._hl.trNbre) { r._hl.trNbre = m; r.trNbre = ""; }
+    r._nonRepris = true;
+    change = true;
+  });
+  return change;
+}
+
+async function ensureSheetLoaded(agence, mois, depth) {
+  depth = depth || 0;
   store[agence] = store[agence] || {};
   if (store[agence][mois]) return; // déjà en mémoire, rien à recharger
   try {
@@ -829,8 +859,8 @@ async function ensureSheetLoaded(agence, mois) {
       if (data.rows) {
         data.rows.forEach(r => { if (!r._id) r._id = uid(); });
         store[agence][mois] = data.rows;
-        // feuille existante : on pose les cases grises et on enregistre
-        // (plus de cases posées automatiquement : seul un clic surligne)
+        // feuille existante : on reprend les « NON » du mois d'avant et on enregistre
+        if (await reprendreNon(agence, mois, data.rows, depth) && depth === 0) pushSheet(agence, mois);
         return;
       }
     }
@@ -839,8 +869,9 @@ async function ensureSheetLoaded(agence, mois) {
   // mémoire seulement (on n'écrit rien tant que personne n'a rien tapé,
   // pour ne jamais bloquer un futur import de vraies données).
   store[agence][mois] = AGENCES[agence].salaries.map(s => emptyRow(s));
-  // feuille pas encore créée : cases grises en mémoire seulement (elles
-  // seront enregistrées avec la première saisie)
+  // feuille pas encore créée : « NON » repris en mémoire seulement (ils
+  // seront enregistrés avec la première saisie)
+  await reprendreNon(agence, mois, store[agence][mois], depth);
 }
 
 // Bascule l'agence/le mois affiché : charge la feuille depuis le serveur
