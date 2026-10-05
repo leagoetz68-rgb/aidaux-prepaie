@@ -817,7 +817,7 @@ document.addEventListener("visibilitychange", () => {
 window.addEventListener("pagehide", flushPendingSaveNow);
 window.addEventListener("beforeunload", flushPendingSaveNow);
 
-// ---- Reprise des « NON » Ticket resto d'un mois sur l'autre ----
+// ---- Reprise du mois précédent : « NON » Ticket resto + avenant CDI → contrat ----
 // Pour chaque salarié, si sa case Ticket resto était « NON » le mois d'avant
 // (même nom), on la remet en « NON ». Chaque ligne n'est traitée qu'une fois
 // (marqueur _nonRepris) : si on enlève le NON à la main, il ne revient pas.
@@ -829,19 +829,33 @@ async function reprendreNon(agence, mois, rows, depth) {
   const prev = nomMois(idx - 1);
   await ensureSheetLoaded(agence, prev, depth + 1);
   const prevRows = (store[agence] || {})[prev] || [];
-  const nonPrec = {};
+  const nonPrec = {}, contratPrec = {};
   prevRows.forEach(r => {
+    const cle = nomCle(r.nom);
     const m = r._hl && r._hl.trNbre;
-    if (TICKET_MARKS.indexOf(m) >= 0) nonPrec[nomCle(r.nom)] = m;
+    if (TICKET_MARKS.indexOf(m) >= 0) nonPrec[cle] = m;
+    // Avenant coché CDI = devient le contrat des mois suivants.
+    // Une fois repris, le contrat continue d'être reporté de mois en mois.
+    const av = String(r.avenant || "").trim();
+    if (av && r.typeContrat === "CDI") contratPrec[cle] = av;
+    else if (r._contratCdi && String(r.contrat || "").trim()) contratPrec[cle] = String(r.contrat).trim();
   });
   let change = false;
   rows.forEach(r => {
-    if (r._nonRepris) return;
     if (!r._hl) r._hl = {};
-    const m = nonPrec[nomCle(r.nom)];
-    if (m && !r._hl.trNbre) { r._hl.trNbre = m; r.trNbre = ""; }
-    r._nonRepris = true;
-    change = true;
+    const cle = nomCle(r.nom);
+    if (!r._nonRepris) {
+      const m = nonPrec[cle];
+      if (m && !r._hl.trNbre) { r._hl.trNbre = m; r.trNbre = ""; }
+      r._nonRepris = true;
+      change = true;
+    }
+    if (!r._avRepris) {
+      const c = contratPrec[cle];
+      if (c) { r.contrat = c; r._contratCdi = c; }
+      r._avRepris = true;
+      change = true;
+    }
   });
   return change;
 }
@@ -1385,12 +1399,22 @@ async function ajouterMoisSuivant() {
   switchSheet(curAgence, nouveau);
 }
 
-initControls();
-chargerMoisServeur();
-initRowHighlight();
-initImportBanner();
-renderTabs();
-switchSheet(curAgence, curMois);
+// À l'ouverture : on va directement sur le mois en cours (s'il existe dans la liste)
+function moisEnCours() {
+  const d = new Date();
+  return nomMois(d.getFullYear() * 12 + d.getMonth());
+}
+(async () => {
+  initControls();
+  initRowHighlight();
+  initImportBanner();
+  renderTabs();
+  await chargerMoisServeur();
+  const courant = moisEnCours();
+  if (MOIS.includes(courant)) curMois = courant;
+  remplirMois();
+  switchSheet(curAgence, curMois);
+})();
 </script>
 </body>
 </html>
