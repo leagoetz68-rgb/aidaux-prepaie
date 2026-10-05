@@ -286,6 +286,10 @@
   td.hl-blue { background: #8fd3ff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   td.hl-blue input { background: #8fd3ff !important; color: var(--text); font-weight: 600; border-radius: 6px; }
   tbody tr.row-selected td.hl-blue { box-shadow: none; }
+  /* une case désactivée (NON, ticket bloqué) laisse passer les clics vers la case */
+  td input:disabled { pointer-events: none; }
+  td.hl-blue.hl-navy input { background: var(--navy) !important; color:#fff; font-weight:700; box-shadow: inset 0 0 0 4px #8fd3ff; }
+  td.hl-blue.hl-orange input { background: var(--orange) !important; color:#fff; font-weight:700; box-shadow: inset 0 0 0 4px #8fd3ff; }
   /* Case grise = ne prend pas les transports / pas de véhicule / pas d'avantage */
   td.hl-grey { background: #9a9a9a; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   td.hl-grey input { background: #9a9a9a; color:#fff; font-weight: 600; border-radius: 6px; }
@@ -997,6 +1001,10 @@ function render() {
       }
       let hl = row._hl[col.key];
       if (hl) td.classList.add(hl);
+      // Bleu surligneur : pour Ticket resto il est rangé à part (clé _bleu)
+      // pour ne pas se mélanger avec le « NON ».
+      const bleuKey = (col.type === "ticket") ? col.key + "_bleu" : col.key;
+      if (col.type === "ticket" && row._hl[bleuKey] === "hl-blue") td.classList.add("hl-blue");
 
       // Ticket resto : cycle au double-clic (inchangé)
       const cycle = ["", "hl-orange", "hl-navy"];
@@ -1038,20 +1046,31 @@ function render() {
       }
       if (col.minWidth) inp.style.minWidth = col.minWidth + "px";
       if (col.left) inp.style.textAlign = "left";
-      // Un clic sur une case (hors nom et Ticket resto) = surligneur bleu.
+      // Un clic sur une case (toutes, y compris nom et Ticket resto) = surligneur bleu.
       // Un clic dans une case déjà active (pour écrire) ne change rien ;
       // re-cliquer dessus depuis une autre case enlève le bleu.
-      if (col.type !== "ticket" && col.type !== "name") {
-        td.addEventListener("mousedown", () => {
-          if (document.activeElement === inp) return;
-          hl = (hl === "hl-blue") ? "" : "hl-blue";
-          td.classList.toggle("hl-blue", hl === "hl-blue");
-          row._hl[col.key] = hl;
-          saveStore();
-        });
-      }
+      let bleuTimer = null;
+      const basculerBleu = () => {
+        const on = row._hl[bleuKey] !== "hl-blue";
+        row._hl[bleuKey] = on ? "hl-blue" : "";
+        if (bleuKey === col.key) hl = row._hl[bleuKey];
+        td.classList.toggle("hl-blue", on);
+        saveStore();
+        if (!td.isConnected) render(); // le tableau a été redessiné entre-temps
+      };
+      td.addEventListener("mousedown", (e) => {
+        if (document.activeElement === inp) return;
+        if (col.type === "ticket") {
+          // on attend un instant : si c'est un double-clic (« NON »), on ne touche pas au bleu
+          if (e.detail > 1) { clearTimeout(bleuTimer); bleuTimer = null; return; }
+          bleuTimer = setTimeout(() => { bleuTimer = null; basculerBleu(); }, 280);
+          return;
+        }
+        basculerBleu();
+      });
       // Ticket resto : double-clic = « NON » (inchangé)
       if (col.type === "ticket") td.addEventListener("dblclick", (e) => {
+        clearTimeout(bleuTimer); bleuTimer = null;
         const cur = hl || "";
         const idx = cycle.indexOf(cur);
         const next = cycle[((idx < 0 ? 0 : idx) + 1) % cycle.length];
