@@ -200,7 +200,9 @@
 
   /* ---- Table ---- */
   .table-wrap {
-    overflow-x: auto;
+    overflow: auto;
+    /* le tableau défile dans son cadre : la ligne des titres reste visible */
+    max-height: calc(100vh - 150px);
     background: var(--card);
     border: 1px solid var(--border);
     border-radius: 16px;
@@ -347,7 +349,7 @@
     .topbar a.back, .toolbar, .row-actions, td.del, .legend .hint, .stats { display: none !important; }
     body { background: #fff; }
     .container { padding: 0; max-width: none; }
-    .table-wrap { box-shadow: none; border: none; }
+    .table-wrap { box-shadow: none; border: none; max-height: none; overflow: visible; }
     .topbar { background: #101a6b !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   }
 tbody td.cdicdd-td{padding:0 8px;width:1%;white-space:nowrap;text-align:center}
