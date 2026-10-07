@@ -247,9 +247,10 @@
   }
 
   /* sticky first columns */
-  td.rownum, th.rownum { }
-  td.name, thead th.hname { }
-  thead th.rownum, thead th.hname { }
+  /* « # » et « Salarié » restent visibles quand on défile vers la droite */
+  td.rownum, th.rownum { position: sticky; left: 0; z-index: 2; min-width: 44px; max-width: 44px; }
+  td.name, thead th.hname { position: sticky; left: 44px; z-index: 2; }
+  thead th.rownum, thead th.hname { z-index: 5; }
 
   tbody td.name {
     text-align: left;
@@ -272,7 +273,7 @@
     color: var(--text);
   }
   tbody td.name input { text-align: left; font-weight: 600; min-width: 210px; color: var(--indigo); }
-  thead th.hname { min-width: 222px; text-align: left; padding-left: 12px; }
+  thead th.hname { min-width: 222px; text-align: left; padding-left: 12px; box-shadow: 1px 0 0 var(--border-strong); }
   tbody td.wide input { text-align: left; min-width: 320px; }
   tbody input:focus {
     outline: none;
