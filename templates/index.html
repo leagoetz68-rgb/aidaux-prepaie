@@ -285,7 +285,7 @@
   td.hl-teal   input { background: var(--teal);   color:#fff; font-weight: 700; border-radius: 6px; }
   td.hl-orange input { background: var(--orange); color:#fff; font-weight: 700; border-radius: 6px; }
   td.hl-navy   input { background: var(--navy);   color:#fff; font-weight: 700; border-radius: 6px; }
-  /* surligneur bleu (toutes les cases sauf Ticket resto) : un clic pour poser/enlever */
+  /* surligneur bleu : double-clic pour poser/enlever (Ticket resto : simple clic) */
   td.hl-blue { background: #8fd3ff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   td.hl-blue input { background: #8fd3ff !important; color: var(--text); font-weight: 600; border-radius: 6px; }
   tbody tr.row-selected td.hl-blue { box-shadow: none; }
@@ -1094,9 +1094,9 @@ function render() {
       }
       if (col.minWidth) inp.style.minWidth = col.minWidth + "px";
       if (col.left) inp.style.textAlign = "left";
-      // Un clic sur une case (toutes, y compris nom et Ticket resto) = surligneur bleu.
-      // Un clic dans une case déjà active (pour écrire) ne change rien ;
-      // re-cliquer dessus depuis une autre case enlève le bleu.
+      // Double-clic sur une case = surligneur bleu (re-double-clic = enlève le bleu).
+      // Un simple clic sert juste à se placer dans la case pour écrire.
+      // Exception Ticket resto : simple clic = bleu, double-clic = « NON » (inchangé).
       let bleuTimer = null;
       const basculerBleu = () => {
         const on = row._hl[bleuKey] !== "hl-blue";
@@ -1106,16 +1106,20 @@ function render() {
         saveStore();
         if (!td.isConnected) render(); // le tableau a été redessiné entre-temps
       };
-      td.addEventListener("mousedown", (e) => {
-        if (document.activeElement === inp) return;
-        if (col.type === "ticket") {
+      if (col.type === "ticket") {
+        td.addEventListener("mousedown", (e) => {
+          if (document.activeElement === inp) return;
           // on attend un instant : si c'est un double-clic (« NON »), on ne touche pas au bleu
           if (e.detail > 1) { clearTimeout(bleuTimer); bleuTimer = null; return; }
           bleuTimer = setTimeout(() => { bleuTimer = null; basculerBleu(); }, 280);
-          return;
-        }
-        basculerBleu();
-      });
+        });
+      } else {
+        td.addEventListener("dblclick", () => {
+          basculerBleu();
+          const sel = window.getSelection && window.getSelection();
+          if (sel) sel.removeAllRanges(); // évite que le double-clic sélectionne le texte
+        });
+      }
       // Ticket resto : double-clic = « NON » (inchangé)
       if (col.type === "ticket") td.addEventListener("dblclick", (e) => {
         clearTimeout(bleuTimer); bleuTimer = null;
