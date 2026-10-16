@@ -1251,10 +1251,9 @@ function exportCsv() {
 // ---- Commande tickets resto : nom + nombre de tickets, uniquement ----
 // Ne garde que les salariés qui ont un nombre saisi dans la case Ticket resto
 // (les cases « NON » ou bloquées sont vides, donc ignorées).
+// Ouvre une page mise en forme, à imprimer ou enregistrer en PDF.
 function exportTickets() {
   const rows = getSheet(curAgence, curMois);
-  const sep = ";";
-  const esc = v => '"' + String(v == null ? "" : v).replace(/"/g, '""') + '"';
   const lignes = [];
   let total = 0;
   rows.forEach(r => {
@@ -1269,23 +1268,43 @@ function exportTickets() {
     alert("Aucun ticket resto saisi pour " + AGENCES[curAgence].nom + " – " + curMois + ".");
     return;
   }
-  const out = [
-    esc("Commande tickets resto – " + AGENCES[curAgence].nom + " – " + curMois),
-    "",
-    [esc("Salarié"), esc("Nombre de tickets")].join(sep),
-  ];
-  lignes.forEach(l => out.push(l.map(esc).join(sep)));
-  out.push([esc("TOTAL"), esc(total)].join(sep));
-  const blob = new Blob(["\ufeff" + out.join("\r\n")], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "tickets_resto_" + AGENCES[curAgence].nom
-    + "_" + curMois.replace(/\s+/g, "_") + ".csv";
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  const h = v => String(v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const agence = AGENCES[curAgence].nom;
+  const date = new Date().toLocaleDateString("fr-FR");
+  const trs = lignes.map((l, i) =>
+    "<tr" + (i % 2 ? ' class="alt"' : "") + "><td>" + h(l[0]) + "</td><td class=\"n\">" + h(l[1]) + "</td></tr>"
+  ).join("");
+  const html = `<!doctype html><html lang="fr"><head><meta charset="utf-8">
+<title>Commande tickets resto – ${h(agence)} – ${h(curMois)}</title>
+<style>
+  body { font-family: "Segoe UI", Arial, sans-serif; color: #1f2a44; margin: 40px auto; max-width: 620px; padding: 0 16px; }
+  .top { display: flex; align-items: center; gap: 16px; border-bottom: 3px solid #0e8a8a; padding-bottom: 14px; }
+  .top img { height: 54px; }
+  h1 { font-size: 22px; margin: 0; }
+  .meta { color: #5b6478; font-size: 14px; margin-top: 4px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 24px; font-size: 15px; }
+  th { background: #1f2a44; color: #fff; text-align: left; padding: 10px 14px; }
+  td { padding: 9px 14px; border-bottom: 1px solid #e3e6ee; }
+  tr.alt td { background: #f4f7fa; }
+  .n { text-align: center; width: 160px; }
+  tr.total td { font-weight: 700; background: #e3f3f3; border-top: 2px solid #0e8a8a; border-bottom: none; }
+  .foot { margin-top: 18px; color: #8a92a6; font-size: 12px; }
+  .actions { margin-top: 28px; text-align: center; }
+  button { background: #0e8a8a; color: #fff; border: 0; border-radius: 6px; padding: 10px 20px; font-size: 15px; cursor: pointer; }
+  @media print { .actions { display: none; } body { margin: 0 auto; } }
+</style></head><body>
+<div class="top"><img src="${location.origin}/logo.png" alt="" onerror="this.remove()">
+<div><h1>Commande tickets restaurant</h1><div class="meta">Agence ${h(agence)} · ${h(curMois)}</div></div></div>
+<table><thead><tr><th>Salarié</th><th class="n">Nombre de tickets</th></tr></thead>
+<tbody>${trs}<tr class="total"><td>TOTAL (${lignes.length} salarié${lignes.length > 1 ? "s" : ""})</td><td class="n">${h(String(total).replace(".", ","))}</td></tr></tbody></table>
+<div class="foot">Document généré le ${date}</div>
+<div class="actions"><button onclick="window.print()">🖨 Imprimer / Enregistrer en PDF</button></div>
+</body></html>`;
+  const w = window.open("", "_blank");
+  if (!w) { alert("Autorisez les fenêtres pop-up pour ce site afin d'afficher la commande."); return; }
+  w.document.open();
+  w.document.write(html);
+  w.document.close();
 }
 
 function renderTabs() {
