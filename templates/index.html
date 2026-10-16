@@ -388,6 +388,7 @@ tbody td.cdicdd-td{padding:0 8px;width:1%;white-space:nowrap;text-align:center}
       <div class="spacer"></div>
       <button class="btn ghost" id="addRow2">＋ Ajouter un salarié</button>
       <button class="btn secondary" id="exportCsv">⬇ Export CSV</button>
+      <button class="btn secondary" id="exportTickets" title="Fichier à envoyer pour la commande des tickets resto">🍽 Commande tickets resto</button>
       <button class="btn ghost" id="printBtn">🖨 Imprimer</button>
     </div>
 
@@ -1247,6 +1248,46 @@ function exportCsv() {
   URL.revokeObjectURL(url);
 }
 
+// ---- Commande tickets resto : nom + nombre de tickets, uniquement ----
+// Ne garde que les salariés qui ont un nombre saisi dans la case Ticket resto
+// (les cases « NON » ou bloquées sont vides, donc ignorées).
+function exportTickets() {
+  const rows = getSheet(curAgence, curMois);
+  const sep = ";";
+  const esc = v => '"' + String(v == null ? "" : v).replace(/"/g, '""') + '"';
+  const lignes = [];
+  let total = 0;
+  rows.forEach(r => {
+    const nom = String(r.nom || "").trim();
+    const nb = String(r.trNbre || "").trim();
+    if (!nom || !nb) return;
+    const n = parseFloat(nb.replace(",", "."));
+    if (!isNaN(n)) { if (n <= 0) return; total += n; }
+    lignes.push([nom, nb]);
+  });
+  if (!lignes.length) {
+    alert("Aucun ticket resto saisi pour " + AGENCES[curAgence].nom + " – " + curMois + ".");
+    return;
+  }
+  const out = [
+    esc("Commande tickets resto – " + AGENCES[curAgence].nom + " – " + curMois),
+    "",
+    [esc("Salarié"), esc("Nombre de tickets")].join(sep),
+  ];
+  lignes.forEach(l => out.push(l.map(esc).join(sep)));
+  out.push([esc("TOTAL"), esc(total)].join(sep));
+  const blob = new Blob(["\ufeff" + out.join("\r\n")], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "tickets_resto_" + AGENCES[curAgence].nom
+    + "_" + curMois.replace(/\s+/g, "_") + ".csv";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 function renderTabs() {
   const bar = document.getElementById("tabs");
   bar.innerHTML = "";
@@ -1291,6 +1332,7 @@ function initControls() {
   document.getElementById("addMois").addEventListener("click", ajouterMoisSuivant);
   document.getElementById("addRow2").addEventListener("click", addRow);
   document.getElementById("exportCsv").addEventListener("click", exportCsv);
+  document.getElementById("exportTickets").addEventListener("click", exportTickets);
   document.getElementById("printBtn").addEventListener("click", () => window.print());
 }
 
