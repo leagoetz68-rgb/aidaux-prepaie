@@ -376,7 +376,7 @@ def definir(token):
 
 # ───────────────────────── Garde de connexion ─────────────────────────
 
-_ENDPOINTS_PUBLICS = {"auth.login", "auth.logout", "auth.oubli", "auth.definir", "static"}
+_ENDPOINTS_PUBLICS = {"auth.login", "auth.logout", "auth.oubli", "auth.definir", "static", "manifest", "service_worker"}
 
 
 def est_connecte():
