@@ -1,7 +1,7 @@
 import json
 import os
 
-from flask import Flask, jsonify, render_template, request, send_from_directory, session
+from flask import Flask, Response, jsonify, render_template, request, send_from_directory, session
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "change-moi-en-prod")
@@ -141,6 +141,41 @@ def api_reset_sheets():
     finally:
         conn.close()
     return jsonify({"ok": True, "supprimees": n})
+
+
+# --- Application installable (écran d'accueil iPhone / Android) ---
+MANIFEST = {
+    "name": "Aid'Aux Pré-paie",
+    "short_name": "Aid'Aux Pré-paie",
+    "description": "Pré-paie AID'Aux",
+    "start_url": "/",
+    "scope": "/",
+    "display": "standalone",
+    "background_color": "#ffffff",
+    "theme_color": "#1B2A6B",
+    "lang": "fr",
+    "icons": [
+        {"src": "/static/icons/icon-192.png", "sizes": "192x192", "type": "image/png"},
+        {"src": "/static/icons/icon-512.png", "sizes": "512x512", "type": "image/png"},
+        {"src": "/static/icons/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"},
+    ],
+}
+
+# Service worker minimal : sans cache, tout passe par le réseau (données toujours à jour).
+SERVICE_WORKER = """self.addEventListener('install', () => self.skipWaiting());
+self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
+self.addEventListener('fetch', () => {});
+"""
+
+
+@app.route("/manifest.webmanifest")
+def manifest():
+    return Response(json.dumps(MANIFEST, ensure_ascii=False), mimetype="application/manifest+json")
+
+
+@app.route("/sw.js")
+def service_worker():
+    return Response(SERVICE_WORKER, mimetype="application/javascript", headers={"Cache-Control": "no-cache"})
 
 
 @app.route("/")

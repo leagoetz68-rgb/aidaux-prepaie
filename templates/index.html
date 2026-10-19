@@ -4,6 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AID'AUX — Pré-paie</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#1B2A6B">
+<link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Aid'Aux Pré-paie">
+<script>if('serviceWorker' in navigator){addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));}</script>
 <link rel="icon" type="image/x-icon" href="{{ url_for('favicon') }}">
 <style>
   :root {
