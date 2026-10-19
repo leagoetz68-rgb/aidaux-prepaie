@@ -365,6 +365,23 @@ tbody td.cdicdd-td{padding:0 8px;width:1%;white-space:nowrap;text-align:center}
 .cdicdd button{font:inherit;font-size:11px;font-weight:700;padding:3px 8px;border-radius:999px;border:1px solid #cfd9e2;background:#fff;color:#8a99a8;cursor:pointer;transition:all .15s}
 .cdicdd button:hover{border-color:var(--teal);color:var(--teal-dark)}
 .cdicdd button.on{background:var(--teal);border-color:var(--teal);color:#fff}
+  /* ---- Téléphone ---- */
+  @media (max-width: 700px) {
+    html, body { overflow-x: hidden; }
+    .topbar { flex-wrap: wrap; padding: 12px 14px; gap: 8px 12px; }
+    .topbar .brand { width: 100%; }
+    .topbar .titles p { display: none; }
+    .topbar > span { margin-left: 0 !important; width: 100%; overflow-wrap: anywhere; }
+    .topbar .back { margin: 0 !important; }
+    .container { padding: 12px 10px 40px; }
+    .toolbar { padding: 12px; gap: 10px; }
+    .toolbar .field, .toolbar select { width: 100%; min-width: 0; }
+    .toolbar .spacer { display: none; }
+    .toolbar .btn { flex: 1 1 calc(50% - 10px); justify-content: center; font-size: .85rem; padding: 10px 8px; }
+    .table-wrap { max-height: calc(100vh - 120px); }
+    tbody td.name input { min-width: 150px; }
+    thead th.hname { min-width: 160px; }
+  }
 </style>
 </head>
 <body>
