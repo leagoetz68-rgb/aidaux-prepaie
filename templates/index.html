@@ -375,6 +375,27 @@ tbody td.cdicdd-td{padding:0 8px;width:1%;white-space:nowrap;text-align:center}
     .legend { flex-wrap: wrap; }
     .legend span, .legend .hint { min-width: 0; white-space: normal; margin-left: 0; }
     .tabs { flex-wrap: wrap; }
+    /* haut de page compact : le tableau doit se voir sans défiler */
+    .topbar { padding: 8px 12px; gap: 4px 10px; }
+    .topbar .brand { width: auto; flex: 1; }
+    .topbar .logo-badge { width: 34px; height: 34px; }
+    .topbar h1 { font-size: 1.05rem; }
+    .topbar > span { display: none; }
+    .topbar .back { padding: 5px 10px; font-size: .78rem; }
+    .container { padding: 8px 8px 30px; }
+    .toolbar { padding: 8px; gap: 6px; border-radius: 12px; }
+    .toolbar .field { flex: 1 1 calc(50% - 6px); width: auto; }
+    .toolbar .field label { display: none; }
+    .toolbar select { padding: 7px 26px 7px 10px; font-size: .85rem; }
+    .toolbar .btn { flex: 1 1 calc(33% - 6px) !important; font-size: .72rem !important; padding: 7px 4px !important; }
+    tbody td.name input { min-width: 130px !important; }
+    thead th.hname { min-width: 140px !important; }
+    table { font-size: .78rem; }
+    .stats { display: none; }
+    .legend { display: none; }
+    .tabs { margin-top: 8px; gap: 4px; }
+    .tabs > * { padding: 6px 10px !important; font-size: .8rem; }
+    .table-wrap { max-height: calc(100vh - 90px); margin-top: 6px; }
     .topbar { flex-wrap: wrap; padding: 12px 14px; gap: 8px 12px; }
     .topbar .brand { width: 100%; }
     .topbar .titles p { display: none; }
