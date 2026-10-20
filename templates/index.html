@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=1500">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AID'AUX — Pré-paie</title>
 <link rel="manifest" href="/manifest.webmanifest">
 <meta name="theme-color" content="#1B2A6B">
@@ -395,7 +395,28 @@ tbody td.cdicdd-td{padding:0 8px;width:1%;white-space:nowrap;text-align:center}
     .legend { display: none; }
     .tabs { margin-top: 8px; gap: 4px; }
     .tabs > * { padding: 6px 10px !important; font-size: .8rem; }
-    .table-wrap { max-height: calc(100vh - 90px); margin-top: 6px; }
+    /* Tableau -> une fiche par salarié */
+    .table-wrap { max-height: none; overflow: visible; background: none; border: 0; box-shadow: none; margin-top: 8px; }
+    #grid, #grid tbody { display: block; width: 100%; }
+    #grid thead { display: none; }
+    #grid tbody tr { display: block; background: #fff; border: 1px solid var(--border); border-radius: 14px;
+                     margin: 0 0 10px; padding: 4px 12px 8px; box-shadow: var(--shadow-sm); position: relative; }
+    #grid tbody td { display: flex; align-items: center; gap: 10px; position: static !important;
+                     border: 0 !important; border-bottom: 1px solid #eef2f5 !important; padding: 5px 0 !important;
+                     min-width: 0 !important; max-width: none !important; width: auto !important; box-shadow: none !important; }
+    #grid tbody td:last-child { border-bottom: 0 !important; }
+    #grid tbody td::before { content: attr(data-label); flex: 0 0 42%; font-size: .74rem; font-weight: 700;
+                             color: var(--muted); text-transform: uppercase; letter-spacing: .03em; text-align: left; }
+    #grid tbody td { text-align: left !important; justify-content: flex-start; }
+    #grid tbody td input { flex: 1; min-width: 0 !important; width: 100%; text-align: left !important;
+                           border: 1px solid var(--border); border-radius: 8px; padding: 7px 9px; font-size: .95rem; }
+    #grid tbody td.rownum { display: none; }
+    #grid tbody td.name { padding: 8px 34px 8px 0 !important; }
+    #grid tbody td.name::before { display: none; }
+    #grid tbody td.name input { font-size: 1.05rem; font-weight: 700; border: 0; padding: 2px 0; }
+    #grid tbody td.del { position: absolute !important; top: 8px; right: 8px; border: 0 !important; padding: 0 !important; }
+    #grid tbody td.del::before { display: none; }
+    #grid tbody td.tr-lock .tr-badge { margin-left: 0; }
     .topbar { flex-wrap: wrap; padding: 12px 14px; gap: 8px 12px; }
     .topbar .brand { width: 100%; }
     .topbar .titles p { display: none; }
@@ -1085,6 +1106,7 @@ function render() {
 
     cols.forEach(col => {
       const td = document.createElement("td");
+      td.dataset.label = String(col.label || col.thLabel || "").replace(/<[^>]+>/g, " ").trim();
       if (col.type === "name") td.className = "name";
       if (col.wide) td.classList.add("wide");
       // La case Ticket resto n'accepte que le marquage « ne bénéficie pas » ;
