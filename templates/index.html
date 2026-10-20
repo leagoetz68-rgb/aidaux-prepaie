@@ -367,7 +367,14 @@ tbody td.cdicdd-td{padding:0 8px;width:1%;white-space:nowrap;text-align:center}
 .cdicdd button.on{background:var(--teal);border-color:var(--teal);color:#fff}
   /* ---- Téléphone ---- */
   @media (max-width: 700px) {
-    html, body { overflow-x: hidden; }
+    html, body { overflow-x: hidden; max-width: 100vw; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+    *, *::before, *::after { box-sizing: border-box; }
+    .container, .container > *, .topbar { max-width: 100vw; min-width: 0; }
+    .table-wrap { max-width: calc(100vw - 20px); -webkit-overflow-scrolling: touch; }
+    .toolbar .btn { white-space: normal; min-width: 0; line-height: 1.25; }
+    .legend { flex-wrap: wrap; }
+    .legend span, .legend .hint { min-width: 0; white-space: normal; margin-left: 0; }
+    .tabs { flex-wrap: wrap; }
     .topbar { flex-wrap: wrap; padding: 12px 14px; gap: 8px 12px; }
     .topbar .brand { width: 100%; }
     .topbar .titles p { display: none; }
