@@ -135,100 +135,104 @@ def api_put_sheet():
 # Cherche dans la documentation de l'API Ximi les adresses qui donnent le
 # planning d'un intervenant (interventions, trajets, absences, formations...)
 # et montre à quoi ressemblent les données pour un intervenant et un jour.
-MOTS_PLANNING = ("intervention", "event", "planning", "schedule", "absence", "unavail",
-                 "indispo", "training", "formation", "travel", "trajet", "agent", "employee",
-                 "appointment", "mission", "activity")
-
-
 @app.route("/admin/ximi-planning")
 def ximi_planning_diagnostic():
-    import re
+    """Diagnostic n°2 : lit les interventions d'un jour dans Ximi et montre
+    leur structure (noms de champs, horaires, statuts), sans données personnelles."""
     from concurrent.futures import ThreadPoolExecutor
     import requests as rq
     import ximi
 
-    nom = (request.args.get("intervenant") or "").strip()
+    nom = (request.args.get("intervenant") or "").strip().lower()
+    prenom = (request.args.get("prenom") or "").strip().lower()
     jour = (request.args.get("date") or "").strip()  # aaaa-mm-jj
-    res = {"aide": "Ajouter ?intervenant=NOM&date=2026-10-20 à l'adresse",
-           "intervenant": nom, "date": jour}
+    res = {"aide": "?intervenant=AMIRI&prenom=Saeideh&date=2026-10-20", "date": jour}
     try:
         entetes = ximi._headers()
     except Exception as e:
         return jsonify({"erreur": "Clés Ximi absentes ou invalides : " + str(e)[:300]})
     base = ximi.BASE_URL
-    DELAI = 7
+    jeton = entetes["Api-Key"]
+    DELAI = 8
 
-    # 1) Documentation Swagger : adresses en lien avec le planning
-    spec = None
-    for doc in ("swagger/docs/v1", "swagger/docs/V1", "swagger/docs/v2", "swagger/v1/swagger.json"):
-        try:
-            r = rq.get(f"{base}/{doc}", headers=entetes, timeout=DELAI)
-            if r.status_code < 400 and r.text.lstrip().startswith("{"):
-                spec = r.json()
-                res["swagger"] = doc
-                break
-        except Exception:
-            continue
-    chemins = {}
-    for chemin, ops in ((spec or {}).get("paths") or {}).items():
-        if not any(m in chemin.lower() for m in MOTS_PLANNING):
-            continue
-        for verbe, op in ops.items():
-            if verbe.lower() != "get" or not isinstance(op, dict):
-                continue
-            chemins[chemin] = [p.get("name") for p in op.get("parameters") or [] if isinstance(p, dict)]
-    res["adresses_planning"] = chemins or "documentation illisible"
-
-    # 2) Intervenant
+    # Intervenant : nom exact (+ prénom)
     agent_id = None
-    if nom:
-        try:
-            agents = ximi.get_all("api/agents")
-            cle = nom.lower().split()[0]
-            trouves = [a for a in agents if cle in (str(a.get("LastName") or a.get("Name") or "")
-                                                     + " " + str((a.get("Contact") or {}).get("LastName") or "")).lower()]
-            res["intervenants_trouves"] = [{"Id": a.get("Id"), "Nom": a.get("LastName") or (a.get("Contact") or {}).get("LastName"),
-                                           "Prenom": a.get("FirstName") or (a.get("Contact") or {}).get("FirstName")}
-                                          for a in trouves[:10]]
-            res["champs_intervenant"] = sorted(agents[0].keys()) if agents else []
-            if trouves:
-                agent_id = trouves[0].get("Id")
-        except Exception as e:
-            res["intervenants_erreur"] = str(e)[:300]
+    try:
+        for a in ximi.get_all("api/agents"):
+            if str(a.get("LastName") or "").strip().lower() == nom and \
+                    (not prenom or str(a.get("FirstName") or "").strip().lower() == prenom):
+                agent_id = a.get("Id")
+                res["intervenant"] = f"{a.get('LastName')} {a.get('FirstName')} (Id {agent_id})"
+                break
+    except Exception as e:
+        res["intervenant_erreur"] = str(e)[:300]
 
-    # 3) Essai de chaque adresse de liste pour cet intervenant et ce jour
-    if agent_id and jour:
-        def essayer(chemin):
-            params_doc = chemins.get(chemin) or []
-            p = {"Top": 50}
-            for n in params_doc:
-                ln = (n or "").lower()
-                if "agent" in ln or "employee" in ln:
-                    p[n] = agent_id
-                elif any(m in ln for m in ("start", "from", "begin", "debut", "min")):
-                    p[n] = jour + "T00:00:00"
-                elif any(m in ln for m in ("end", "to", "fin", "max")) and "top" != ln:
-                    p[n] = jour + "T23:59:59"
-            url = base.replace("/Ximi3", "") + chemin if chemin.startswith("/Ximi3") else f"{base}/{chemin.lstrip('/')}"
+    PERSO = ("name", "phone", "email", "address", "street", "city", "zip", "social", "birth",
+             "comment", "note", "data", "label", "title", "latitude", "longitude")
+
+    def masquer(v, cle=""):
+        """Garde la structure, les dates, nombres, statuts ; masque les textes personnels."""
+        if isinstance(v, dict):
+            return {k: masquer(x, k) for k, x in v.items()}
+        if isinstance(v, list):
+            return [masquer(x, cle) for x in v[:3]]
+        if isinstance(v, str) and any(m in cle.lower() for m in PERSO) and "type" not in cle.lower():
+            return "…" if v else v
+        return v
+
+    def contient(v, valeur):
+        if isinstance(v, dict):
+            return any(contient(x, valeur) for x in v.values())
+        if isinstance(v, list):
+            return any(contient(x, valeur) for x in v)
+        return v == valeur
+
+    debut, fin = jour + "T00:00:00", jour + "T23:59:59"
+    essais = {
+        "interventions/all filter.start": ("api/interventions/all",
+            {"filter.start": debut, "filter.end": fin, "Top": 1000}, {}),
+        "interventions/all Filter.Start": ("api/interventions/all",
+            {"Filter.Start": debut, "Filter.End": fin, "Top": 1000}, {}),
+        "interventions/all request.filter.start": ("api/interventions/all",
+            {"request.filter.start": debut, "request.filter.end": fin, "request.top": 1000}, {}),
+        "interventions Bearer": ("api/interventions",
+            {"startDate": debut, "endDate": fin, "Top": 1000}, {"Authorization": "Bearer " + jeton}),
+        "interventions brut": ("api/interventions",
+            {"startDate": debut, "endDate": fin, "Top": 1000}, {"Authorization": jeton}),
+        "agents/events Bearer": ("api/agents/events",
+            {"StartDate": debut, "EndDate": fin, "Top": 1000}, {"Authorization": "Bearer " + jeton}),
+        "agentAbsences Bearer": ("api/agentAbsences",
+            {"startDate": debut, "endDate": fin, "Top": 1000}, {"Authorization": "Bearer " + jeton}),
+    }
+
+    def essayer(item):
+        nom_essai, (chemin, params, extra) = item
+        try:
+            r = rq.get(f"{base}/{chemin}", headers={**entetes, **extra}, params=params, timeout=DELAI)
+            e = {"code": r.status_code}
             try:
-                r = rq.get(url, headers=entetes, params=p, timeout=DELAI)
-                entree = {"code": r.status_code, "parametres": p}
-                try:
-                    j = r.json()
-                    lignes = j.get("Results", j) if isinstance(j, dict) else j
-                    if isinstance(lignes, list):
-                        entree["nb"] = len(lignes)
-                        entree["exemples"] = lignes[:3]
-                    else:
-                        entree["reponse"] = str(j)[:400]
-                except ValueError:
-                    entree["reponse"] = r.text[:200]
-                return chemin, entree
-            except Exception as e:
-                return chemin, {"erreur": str(e)[:150]}
-        a_tester = [c for c in chemins if "{" not in c][:25]
-        with ThreadPoolExecutor(max_workers=10) as ex:
-            res["essais"] = dict(ex.map(essayer, a_tester))
+                j = r.json()
+            except ValueError:
+                e["reponse"] = r.text[:200]
+                return nom_essai, e
+            lignes = j.get("Results", j) if isinstance(j, dict) else j
+            if not isinstance(lignes, list):
+                e["reponse"] = str(j)[:300]
+                return nom_essai, e
+            e["nb"] = len(lignes)
+            if lignes:
+                e["champs"] = sorted(lignes[0].keys()) if isinstance(lignes[0], dict) else []
+            a_lui = [l for l in lignes if agent_id and contient(l, agent_id)]
+            e["nb_pour_intervenant"] = len(a_lui)
+            e["exemples_intervenant"] = [masquer(l) for l in a_lui[:8]]
+            if not a_lui:
+                e["exemple_quelconque"] = masquer(lignes[0]) if lignes else None
+            return nom_essai, e
+        except Exception as ex:
+            return nom_essai, {"erreur": str(ex)[:200]}
+
+    with ThreadPoolExecutor(max_workers=7) as ex:
+        res["essais"] = dict(ex.map(essayer, essais.items()))
     return Response(json.dumps(res, ensure_ascii=False, indent=2, default=str),
                     mimetype="application/json")
 
