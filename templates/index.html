@@ -1402,6 +1402,7 @@ function exportTickets() {
   .foot { margin-top: 18px; color: #8a92a6; font-size: 12px; }
   .actions { margin-top: 28px; text-align: center; }
   button { background: #0e8a8a; color: #fff; border: 0; border-radius: 6px; padding: 10px 20px; font-size: 15px; cursor: pointer; }
+  button[disabled] { opacity: .6; cursor: wait; }
   @media print { .actions { display: none; } body { margin: 0 auto; } }
 </style></head><body>
 <div class="top"><img src="${location.origin}/logo.png" alt="" onerror="this.remove()">
@@ -1409,7 +1410,55 @@ function exportTickets() {
 <table><thead><tr><th>Salarié</th><th class="n">Nombre de tickets</th></tr></thead>
 <tbody>${trs}<tr class="total"><td>TOTAL (${lignes.length} salarié${lignes.length > 1 ? "s" : ""})</td><td class="n">${h(String(total).replace(".", ","))}</td></tr></tbody></table>
 <div class="foot">Document généré le ${date}</div>
-<div class="actions"><button onclick="window.print()">🖨 Imprimer / Enregistrer en PDF</button></div>
+<div class="actions"><button id="pdf" disabled>Préparation du PDF…</button></div>
+<script>
+const D = ${JSON.stringify({ agence, mois: curMois, date, total: String(total).replace(".", ","), lignes }).replace(/</g, "\\u003c")};
+const bouton = document.getElementById("pdf");
+function telecharger() {
+  const doc = new jspdf.jsPDF({ unit: "mm", format: "a4" });
+  const logo = document.querySelector(".top img");
+  let x = 20;
+  if (logo && logo.complete && logo.naturalWidth) {
+    try { const h = 18, w = h * logo.naturalWidth / logo.naturalHeight; doc.addImage(logo, "PNG", 20, 14, w, h); x = 24 + w; } catch (e) {}
+  }
+  doc.setFont("helvetica", "bold"); doc.setFontSize(17); doc.setTextColor(31, 42, 68);
+  doc.text("Commande tickets restaurant", x, 22);
+  doc.setFont("helvetica", "normal"); doc.setFontSize(10.5); doc.setTextColor(91, 100, 120);
+  doc.text("Agence " + D.agence + " · " + D.mois, x, 29);
+  doc.setDrawColor(14, 138, 138); doc.setLineWidth(0.8); doc.line(20, 36, 190, 36);
+  doc.autoTable({
+    startY: 42, margin: { left: 20, right: 20 },
+    head: [["Salarié", { content: "Nombre de tickets", styles: { halign: "center" } }]],
+    body: D.lignes,
+    foot: [["TOTAL (" + D.lignes.length + " salarié" + (D.lignes.length > 1 ? "s" : "") + ")",
+            { content: D.total, styles: { halign: "center" } }]],
+    styles: { fontSize: 10.5, cellPadding: 3, textColor: [31, 42, 68] },
+    headStyles: { fillColor: [31, 42, 68], textColor: 255 },
+    footStyles: { fillColor: [227, 243, 243], textColor: [31, 42, 68], fontStyle: "bold" },
+    alternateRowStyles: { fillColor: [244, 247, 250] },
+    columnStyles: { 1: { halign: "center", cellWidth: 45 } },
+  });
+  doc.setFontSize(8.5); doc.setTextColor(138, 146, 166);
+  doc.text("Document généré le " + D.date, 20, doc.lastAutoTable.finalY + 8);
+  doc.save("Commande tickets resto - " + D.agence + " - " + D.mois + ".pdf");
+}
+// bibliothèque PDF chargée sans bloquer la page ; si elle n'arrive pas en 6 s
+// (réseau filtré...), on se rabat sur l'impression du navigateur
+function charger(src, suite) {
+  const s = document.createElement("script");
+  s.src = src; s.onload = suite; s.onerror = suite;
+  document.head.appendChild(s);
+}
+charger("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js", () =>
+  charger("https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js", () => {}));
+(function pret(n) {
+  if (window.jspdf && window.jspdf.jsPDF && window.jspdf.jsPDF.API.autoTable) {
+    bouton.disabled = false; bouton.textContent = "⬇ Télécharger le PDF"; bouton.onclick = telecharger;
+  } else if (n > 60) {
+    bouton.disabled = false; bouton.textContent = "Imprimer / Enregistrer en PDF"; bouton.onclick = () => window.print();
+  } else setTimeout(() => pret(n + 1), 100);
+})(0);
+<\/script>
 </body></html>`;
   const w = window.open("", "_blank");
   if (!w) { alert("Autorisez les fenêtres pop-up pour ce site afin d'afficher la commande."); return; }
