@@ -147,6 +147,35 @@
   }
   .btn.ghost:hover { background: #f3f7f9; border-color: var(--teal); }
 
+  /* ---- Fenêtre « Tickets resto depuis Ximi » ---- */
+  .tx-fermer {
+    width: 34px; height: 34px; border-radius: 50%; border: 0; cursor: pointer;
+    background: #f1f5f8; color: #5b6478; font-size: 16px; line-height: 1;
+    display: inline-flex; align-items: center; justify-content: center; flex: none;
+    transition: background .15s ease, color .15s ease;
+  }
+  .tx-fermer:hover { background: #e0f7f6; color: var(--teal-dark); }
+  .tx-btn {
+    border: 0; border-radius: 999px; padding: 9px 20px; cursor: pointer;
+    font-size: .88rem; font-weight: 600; color: #fff; background: var(--teal-dark);
+    box-shadow: 0 3px 10px rgba(10,143,136,.25); transition: background .15s ease, transform .12s ease;
+  }
+  .tx-btn:hover { background: #087a74; transform: translateY(-1px); }
+  .tx-btn.clair {
+    background: transparent; color: #5b6478; box-shadow: none;
+  }
+  .tx-btn.clair:hover { background: #f1f5f8; color: #1f2a44; transform: none; }
+  .tx-mini {
+    border: 1px solid var(--teal); background: #fff; color: var(--teal-dark);
+    border-radius: 999px; padding: 3px 12px; font-size: .8rem; font-weight: 600; cursor: pointer;
+  }
+  .tx-mini:hover { background: #e0f7f6; }
+  #ticketsXimi input[type=checkbox] { accent-color: var(--teal-dark); width: 16px; height: 16px; cursor: pointer; }
+  #ticketsXimi input[type=number] {
+    width: 64px; padding: 3px 6px; border: 1px solid var(--border); border-radius: 6px; text-align: center;
+  }
+  #ticketsXimi a { color: var(--teal-dark); font-weight: 600; }
+
   /* ---- Stat chips ---- */
   .stats { display: flex; flex-wrap: wrap; gap: 12px; margin: 18px 0 6px; }
   .chip {
@@ -1407,7 +1436,7 @@ function fenetreTickets(contenu) {
   fond.innerHTML = '<div style="background:#fff;border-radius:10px;max-width:760px;width:100%;padding:20px 22px;box-shadow:0 10px 40px rgba(0,0,0,.25);font-size:14px;">'
     + '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px;">'
     + '<h2 style="margin:0;font-size:18px;">🧮 Tickets resto depuis Ximi — ' + AGENCES[curAgence].nom + ' · ' + curMois + '</h2>'
-    + '<button class="btn ghost" onclick="document.getElementById(\'ticketsXimi\').remove()">✕</button></div>'
+    + '<button class="tx-fermer" title="Fermer" onclick="document.getElementById(\'ticketsXimi\').remove()">✕</button></div>'
     + contenu + '</div>';
   return fond;
 }
@@ -1506,14 +1535,14 @@ async function calculerTicketsXimi(force) {
     + (data.dernier_tour ? ' Planning lu le ' + h(data.dernier_tour) + '.' : '')
     + ' <a href="#" id="relireXimi">Relire Ximi maintenant</a></p>'
     + '<p style="margin:0 0 10px;">Un trou entre deux prestations compte comme intervacation jusqu\'à '
-    + '<input id="limiteInterv" type="number" min="0" max="600" step="5" value="' + limiteIntervacation() + '" style="width:64px;"> min '
-    + '<button class="btn ghost" id="recalcTickets" style="padding:4px 10px;">Recalculer</button></p>'
+    + '<input id="limiteInterv" type="number" min="0" max="600" step="5" value="' + limiteIntervacation() + '"> min '
+    + '<button class="tx-mini" id="recalcTickets">Recalculer</button></p>'
     + '<div style="overflow:auto;"><table style="width:100%;border-collapse:collapse;">'
     + '<thead><tr style="text-align:left;border-bottom:2px solid #1f2a44;"><th></th><th>Salarié</th><th style="text-align:center;">Actuel</th><th style="text-align:center;">Proposé</th><th></th></tr></thead>'
     + '<tbody>' + trs + '</tbody></table></div>'
     + '<div style="margin-top:14px;display:flex;gap:10px;justify-content:flex-end;">'
-    + '<button class="btn ghost" onclick="document.getElementById(\'ticketsXimi\').remove()">Annuler</button>'
-    + '<button class="btn" id="appliquerTickets">Appliquer les lignes cochées</button></div>'
+    + '<button class="tx-btn clair" onclick="document.getElementById(\'ticketsXimi\').remove()">Annuler</button>'
+    + '<button class="tx-btn" id="appliquerTickets">✓ Appliquer les lignes cochées</button></div>'
   );
   document.getElementById("recalcTickets").addEventListener("click", () => {
     const v = parseInt(document.getElementById("limiteInterv").value, 10);
