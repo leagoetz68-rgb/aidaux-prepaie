@@ -149,6 +149,7 @@ XIMI_STATUT_ANNULE = -3
 XIMI_JOURS_AVANT = 100   # on garde ~3 mois en arrière...
 XIMI_JOURS_APRES = 62    # ... et 2 mois en avant (prestations prévues)
 SEUIL_TICKET_MIN = 6 * 60
+TRIS_XIMI = ["Start desc", "-Start", "Start:desc", "StartDesc"]
 MOIS_FR = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août",
            "septembre", "octobre", "novembre", "décembre"]
 
@@ -233,14 +234,44 @@ def api_ximi_rafraichir():
                     and maintenant - fini_le < timedelta(minutes=20):
                 return jsonify({"ok": True, "termine": True, "lues": 0,
                                 "dernier_tour": _etat(cur, "dernier_tour")})
+            # Tri par date décroissante, si Ximi l'accepte : on s'arrête alors dès
+            # qu'on atteint des interventions trop anciennes au lieu de relire
+            # tout l'historique. On essaie une syntaxe par appel (Vercel coupe à ~10 s).
+            tri = _etat(cur, "tri")
+            if tri is None:
+                essais = [t for t in TRIS_XIMI if t not in (_etat(cur, "tris_rates") or "").split("|")]
+                if essais:
+                    ok = False
+                    try:
+                        test = ximi.get("api/interventions/all",
+                                        {"Top": 30, "Offset": 0, "Sorting": essais[0]}, timeout=7)
+                        dates = [_dt_ximi(x.get("Start")) for x in test.get("Results", [])]
+                        dates = [d for d in dates if d]
+                        ok = len(dates) > 5 and dates == sorted(dates, reverse=True) \
+                            and dates[0] > maintenant - timedelta(days=30)
+                    except Exception:
+                        pass
+                    if ok:
+                        _set_etat(cur, "tri", essais[0])
+                        _set_etat(cur, "offset", 0)  # nouvel ordre : on repart du début
+                        offset = 0
+                    else:
+                        _set_etat(cur, "tris_rates", (_etat(cur, "tris_rates") or "") + "|" + essais[0])
+                    conn.commit()
+                    return jsonify({"ok": True, "termine": False, "lues": offset,
+                                    "etape": "test du tri"})
+                _set_etat(cur, "tri", "")
+                tri = ""
             if offset == 0:
                 _set_etat(cur, "debut_tour", maintenant.isoformat())
             termine, pages = False, 0
-            # Vercel coupe une requête au bout de ~10 s : on ne commence pas de
-            # nouvelle page après 4 s, et une page trop lente est abandonnée.
-            while time.time() - t0 < 4:
-                res = ximi.get("api/interventions/all", {"Top": 1000, "Offset": offset,
-                                                          "ComputeHasMoreRows": "true"}, timeout=5)
+            # Vercel coupe une requête au bout de ~10 s : petites pages, pas de
+            # nouvelle page après 2 s, une page trop lente est abandonnée.
+            while time.time() - t0 < 2:
+                params = {"Top": 250, "Offset": offset, "ComputeHasMoreRows": "true"}
+                if tri:
+                    params["Sorting"] = tri
+                res = ximi.get("api/interventions/all", params, timeout=7)
                 items = res.get("Results", []) if isinstance(res, dict) else []
                 pages += 1
                 lignes = []
@@ -263,7 +294,9 @@ def api_ximi_rafraichir():
                             statut = EXCLUDED.statut, vu_le = now()
                     """, lignes)
                 offset += len(items)
-                if not res.get("HasMoreRows") or not items:
+                trop_vieux = tri and items and all(
+                    (_dt_ximi(x.get("Start")) or maintenant) < bas for x in items)
+                if not res.get("HasMoreRows") or not items or trop_vieux:
                     termine = True
                     break
             if termine:

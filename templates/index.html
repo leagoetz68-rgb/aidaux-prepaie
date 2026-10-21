@@ -1435,12 +1435,13 @@ async function rafraichirXimi(majTexte, force) {
     const sec = Math.round((Date.now() - t0) / 1000);
     if (ok) {
       echecs = 0;
-      majTexte("Lecture du planning Ximi… " + d.lues + " interventions parcourues (" + sec + " s)");
+      majTexte(d.etape === "test du tri" ? "Préparation de la lecture Ximi… (" + sec + " s)"
+               : "Lecture du planning Ximi… " + d.lues + " interventions parcourues (" + sec + " s)");
       if (d.termine) return;
     } else {
       echecs++;
-      if (echecs >= 5) throw new Error(derniere);
-      majTexte("Lecture du planning Ximi… nouvel essai (" + echecs + "/5, " + sec + " s)");
+      if (echecs >= 8) throw new Error(derniere);
+      majTexte("Lecture du planning Ximi… Ximi est lent, nouvel essai (" + echecs + "/8, " + sec + " s)");
     }
   }
 }
