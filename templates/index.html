@@ -1478,18 +1478,26 @@ async function calculerTicketsXimi(force) {
     else if (l.bloque) etat = '<span style="color:#8a92a6;">pas encore éligible — inchangé</span>';
     else if (!l.a) etat = '<span style="color:#b45309;">introuvable dans Ximi (ou aucune prestation)</span>';
     else { etat = ""; coche = String(l.propose) !== String(l.r.trNbre || "").trim(); }
-    const detail = l.a ? l.a.jours.map(j =>
-      '<span style="display:inline-block;margin:1px 4px 1px 0;padding:1px 5px;border-radius:4px;background:' + (j.ticket ? "#e3f3e8" : "#f2f4f7") + ';">'
-      + j.date.slice(8, 10) + '/' + j.date.slice(5, 7) + ' ' + hMin(j.minutes) + (j.ticket ? " ✓" : "") + '</span>').join("") : "";
+    // une pastille par jour : jour de la semaine, date, total ; turquoise si ticket
+    const JOURS = ["dim", "lun", "mar", "mer", "jeu", "ven", "sam"];
+    const detail = l.a ? '<div style="display:flex;flex-wrap:wrap;gap:6px;">' + l.a.jours.map(j => {
+      const js = JOURS[new Date(j.date + "T12:00:00").getDay()];
+      return '<div style="min-width:62px;text-align:center;border-radius:8px;padding:4px 6px;line-height:1.25;'
+        + (j.ticket ? 'background:#e0f7f6;border:1px solid #00BBB4;color:#0a5f5b;' : 'background:#f6f8fa;border:1px solid #e4ebef;color:#7a8a99;') + '">'
+        + '<div style="font-size:10px;text-transform:uppercase;letter-spacing:.04em;">' + js + ' ' + j.date.slice(8, 10) + '/' + j.date.slice(5, 7) + '</div>'
+        + '<div style="font-size:13px;font-weight:700;">' + hMin(j.minutes) + (j.ticket ? ' 🍽' : '') + '</div></div>';
+    }).join("") + '</div>' : "";
     const modifiable = !l.non && !l.bloque && l.a;
     return '<tr style="border-bottom:1px solid #e3e6ee;vertical-align:top;">'
       + '<td style="padding:6px 4px;">' + (modifiable ? '<input type="checkbox" data-i="' + i + '"' + (coche ? " checked" : "") + '>' : "") + '</td>'
       + '<td style="padding:6px 4px;"><b>' + h(l.r.nom) + '</b>'
-      + (detail ? '<details><summary style="cursor:pointer;color:#5b6478;font-size:12px;">détail par jour</summary><div style="font-size:12px;margin-top:4px;">' + detail + '</div></details>' : "")
+      + (detail ? '<br><button type="button" class="voirJours" data-i="' + i + '" style="margin-top:4px;border:0;background:none;color:#0a8f88;font-size:12px;font-weight:600;cursor:pointer;padding:0;">📅 Voir les jours</button>' : "")
       + '</td>'
       + '<td style="padding:6px 4px;text-align:center;">' + h(l.r.trNbre || "—") + '</td>'
       + '<td style="padding:6px 4px;text-align:center;font-weight:700;">' + (l.a && !l.non && !l.bloque ? l.propose : "") + '</td>'
-      + '<td style="padding:6px 4px;">' + etat + '</td></tr>';
+      + '<td style="padding:6px 4px;">' + etat + '</td></tr>'
+      + (detail ? '<tr id="jours-' + i + '" style="display:none;"><td></td><td colspan="4" style="padding:4px 4px 10px;font-size:12px;text-align:left;">'
+        + '<div style="color:#7a8a99;margin:2px 0 6px;">Heures du jour — en turquoise 🍽 = 6 h ou plus = 1 ticket</div>' + detail + '</td></tr>' : "");
   }).join("");
 
   fenetreTickets(
@@ -1512,6 +1520,12 @@ async function calculerTicketsXimi(force) {
     if (v >= 0) { try { localStorage.setItem(LIMITE_KEY, String(v)); } catch (e) {} }
     calculerTicketsXimi();
   });
+  document.querySelectorAll("#ticketsXimi .voirJours").forEach(b => b.addEventListener("click", () => {
+    const tr = document.getElementById("jours-" + b.dataset.i);
+    const ouvert = tr.style.display !== "none";
+    tr.style.display = ouvert ? "none" : "";
+    b.textContent = ouvert ? "📅 Voir les jours" : "📅 Masquer les jours";
+  }));
   document.getElementById("relireXimi").addEventListener("click", e => { e.preventDefault(); calculerTicketsXimi(true); });
   document.getElementById("appliquerTickets").addEventListener("click", () => {
     let n = 0;
