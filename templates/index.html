@@ -1412,7 +1412,7 @@ function fenetreTickets(contenu) {
   return fond;
 }
 
-async function rafraichirXimi(majTexte, force) {
+async function rafraichirXimi(majTexte, force, mois) {
   // l'API Ximi se lit par morceaux : on rappelle le serveur jusqu'à la fin du tour
   // Un appel bloqué ou refusé (Ximi lent, coupure Vercel) est réessayé ; on
   // abandonne après 5 échecs d'affilée.
@@ -1423,7 +1423,7 @@ async function rafraichirXimi(majTexte, force) {
     const minuteur = setTimeout(() => ctl.abort(), 25000);
     let d = {}, ok = false;
     try {
-      const r = await fetch("/api/ximi/rafraichir" + (force && i === 0 ? "?force=1" : ""),
+      const r = await fetch("/api/ximi/rafraichir?mois=" + encodeURIComponent(mois) + (force && i === 0 ? "&force=1" : ""),
                             { method: "POST", signal: ctl.signal });
       d = await r.json().catch(() => ({}));
       ok = r.ok && d.ok;
@@ -1435,12 +1435,13 @@ async function rafraichirXimi(majTexte, force) {
     const sec = Math.round((Date.now() - t0) / 1000);
     if (ok) {
       echecs = 0;
-      majTexte("Lecture du planning Ximi… " + d.lues + " interventions parcourues (" + sec + " s)");
+      majTexte(d.etape === "test du tri" ? "Préparation de la lecture Ximi… (" + sec + " s)"
+               : "Lecture du planning Ximi… " + d.lues + " interventions parcourues (" + sec + " s)");
       if (d.termine) return;
     } else {
       echecs++;
-      if (echecs >= 5) throw new Error(derniere);
-      majTexte("Lecture du planning Ximi… nouvel essai (" + echecs + "/5, " + sec + " s)");
+      if (echecs >= 8) throw new Error(derniere);
+      majTexte("Lecture du planning Ximi… Ximi est lent, nouvel essai (" + echecs + "/8, " + sec + " s)");
     }
   }
 }
@@ -1451,7 +1452,7 @@ async function calculerTicketsXimi(force) {
   const majTexte = t => { const el = document.getElementById("ticketsEtat"); if (el) el.textContent = t; };
   let data;
   try {
-    await rafraichirXimi(majTexte, force === true);
+    await rafraichirXimi(majTexte, force === true, sheetMois);
     majTexte("Calcul…");
     const r = await fetch("/api/ximi/tickets?mois=" + encodeURIComponent(sheetMois) + "&limite=" + limiteIntervacation());
     data = await r.json();
