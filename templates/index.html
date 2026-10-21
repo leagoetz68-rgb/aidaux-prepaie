@@ -139,13 +139,49 @@
   }
   .btn:hover { background: #e8390c; transform: translateY(-1px); }
   .btn:active { transform: translateY(0); }
-  .btn.secondary { background: var(--teal-dark); box-shadow: 0 4px 12px rgba(16,26,107,.25); }
-  .btn.secondary:hover { background: #000b6e; }
+  .btn.secondary {
+    background: #e6f7f6; color: var(--teal-dark); box-shadow: none;
+    border: 1px solid #bfe9e6;
+  }
+  .btn.secondary:hover { background: var(--teal-dark); color: #fff; border-color: var(--teal-dark); }
+  .btn .ic {
+    width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  }
   .btn.ghost {
     background: #fff; color: var(--indigo);
     border: 1px solid var(--border-strong); box-shadow: none;
   }
   .btn.ghost:hover { background: #f3f7f9; border-color: var(--teal); }
+
+  /* ---- Fenêtre « Tickets resto depuis Ximi » ---- */
+  .tx-fermer {
+    width: 34px; height: 34px; border-radius: 50%; border: 0; cursor: pointer;
+    background: #f1f5f8; color: #5b6478; font-size: 16px; line-height: 1;
+    display: inline-flex; align-items: center; justify-content: center; flex: none;
+    transition: background .15s ease, color .15s ease;
+  }
+  .tx-fermer:hover { background: #e0f7f6; color: var(--teal-dark); }
+  .tx-btn {
+    border: 0; border-radius: 999px; padding: 9px 20px; cursor: pointer;
+    font-size: .88rem; font-weight: 600; color: #fff; background: var(--teal-dark);
+    box-shadow: 0 3px 10px rgba(10,143,136,.25); transition: background .15s ease, transform .12s ease;
+  }
+  .tx-btn:hover { background: #087a74; transform: translateY(-1px); }
+  .tx-btn.clair {
+    background: transparent; color: #5b6478; box-shadow: none;
+  }
+  .tx-btn.clair:hover { background: #f1f5f8; color: #1f2a44; transform: none; }
+  .tx-mini {
+    border: 1px solid var(--teal); background: #fff; color: var(--teal-dark);
+    border-radius: 999px; padding: 3px 12px; font-size: .8rem; font-weight: 600; cursor: pointer;
+  }
+  .tx-mini:hover { background: #e0f7f6; }
+  #ticketsXimi input[type=checkbox] { accent-color: var(--teal-dark); width: 16px; height: 16px; cursor: pointer; }
+  #ticketsXimi input[type=number] {
+    width: 64px; padding: 3px 6px; border: 1px solid var(--border); border-radius: 6px; text-align: center;
+  }
+  #ticketsXimi a { color: var(--teal-dark); font-weight: 600; }
 
   /* ---- Stat chips ---- */
   .stats { display: flex; flex-wrap: wrap; gap: 12px; margin: 18px 0 6px; }
@@ -457,13 +493,13 @@ tbody td.cdicdd-td{padding:0 8px;width:1%;white-space:nowrap;text-align:center}
         <label for="mois">Mois</label>
         <div class="select-wrap"><select id="mois"></select></div>
       </div>
-      <button class="btn ghost" id="addMois" title="Ajouter le mois suivant">＋ Mois suivant</button>
+      <button class="btn ghost" id="addMois" title="Ajouter le mois suivant"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Mois suivant</button>
       <div class="spacer"></div>
-      <button class="btn ghost" id="addRow2">＋ Ajouter un salarié</button>
-      <button class="btn secondary" id="exportCsv">⬇ Export CSV</button>
-      <button class="btn secondary" id="calcTickets" title="Calcule les tickets resto depuis le planning Ximi">🧮 Calculer tickets (Ximi)</button>
-      <button class="btn secondary" id="exportTickets" title="Fichier à envoyer pour la commande des tickets resto">🍽 Commande tickets resto</button>
-      <button class="btn ghost" id="printBtn">🖨 Imprimer</button>
+      <button class="btn ghost" id="addRow2"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Ajouter un salarié</button>
+      <button class="btn secondary" id="exportCsv"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>Export CSV</button>
+      <button class="btn secondary" id="calcTickets" title="Calcule les tickets resto depuis le planning Ximi"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 12h.01M12 12h.01M16 12h.01M8 16h.01M12 16h.01M16 16h.01"/></svg>Calculer tickets (Ximi)</button>
+      <button class="btn secondary" id="exportTickets" title="Fichier à envoyer pour la commande des tickets resto"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8a2 2 0 0 0 2-2h12a2 2 0 0 0 2 2v8a2 2 0 0 0-2 2H6a2 2 0 0 0-2-2z"/><path d="M10 6v12" stroke-dasharray="2 2"/></svg>Commande tickets resto</button>
+      <button class="btn ghost" id="printBtn"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 9V4h10v5M7 17H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2"/><rect x="7" y="14" width="10" height="7" rx="1"/></svg>Imprimer</button>
     </div>
 
     <div class="stats">
@@ -1406,8 +1442,12 @@ function fenetreTickets(contenu) {
   }
   fond.innerHTML = '<div style="background:#fff;border-radius:10px;max-width:760px;width:100%;padding:20px 22px;box-shadow:0 10px 40px rgba(0,0,0,.25);font-size:14px;">'
     + '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px;">'
-    + '<h2 style="margin:0;font-size:18px;">🧮 Tickets resto depuis Ximi — ' + AGENCES[curAgence].nom + ' · ' + curMois + '</h2>'
-    + '<button class="btn ghost" onclick="document.getElementById(\'ticketsXimi\').remove()">✕</button></div>'
+    + '<h2 style="margin:0;font-size:18px;display:flex;align-items:center;gap:10px;">'
+    + '<span style="width:32px;height:32px;border-radius:9px;background:#e6f7f6;color:#0a8f88;display:inline-flex;align-items:center;justify-content:center;flex:none;">'
+    + '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+    + '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 12h.01M12 12h.01M16 12h.01M8 16h.01M12 16h.01M16 16h.01"/></svg></span>'
+    + 'Tickets resto depuis Ximi — ' + AGENCES[curAgence].nom + ' · ' + curMois + '</h2>'
+    + '<button class="tx-fermer" title="Fermer" onclick="document.getElementById(\'ticketsXimi\').remove()">✕</button></div>'
     + contenu + '</div>';
   return fond;
 }
@@ -1506,14 +1546,14 @@ async function calculerTicketsXimi(force) {
     + (data.dernier_tour ? ' Planning lu le ' + h(data.dernier_tour) + '.' : '')
     + ' <a href="#" id="relireXimi">Relire Ximi maintenant</a></p>'
     + '<p style="margin:0 0 10px;">Un trou entre deux prestations compte comme intervacation jusqu\'à '
-    + '<input id="limiteInterv" type="number" min="0" max="600" step="5" value="' + limiteIntervacation() + '" style="width:64px;"> min '
-    + '<button class="btn ghost" id="recalcTickets" style="padding:4px 10px;">Recalculer</button></p>'
+    + '<input id="limiteInterv" type="number" min="0" max="600" step="5" value="' + limiteIntervacation() + '"> min '
+    + '<button class="tx-mini" id="recalcTickets">Recalculer</button></p>'
     + '<div style="overflow:auto;"><table style="width:100%;border-collapse:collapse;">'
     + '<thead><tr style="text-align:left;border-bottom:2px solid #1f2a44;"><th></th><th>Salarié</th><th style="text-align:center;">Actuel</th><th style="text-align:center;">Proposé</th><th></th></tr></thead>'
     + '<tbody>' + trs + '</tbody></table></div>'
     + '<div style="margin-top:14px;display:flex;gap:10px;justify-content:flex-end;">'
-    + '<button class="btn ghost" onclick="document.getElementById(\'ticketsXimi\').remove()">Annuler</button>'
-    + '<button class="btn" id="appliquerTickets">Appliquer les lignes cochées</button></div>'
+    + '<button class="tx-btn clair" onclick="document.getElementById(\'ticketsXimi\').remove()">Annuler</button>'
+    + '<button class="tx-btn" id="appliquerTickets">✓ Appliquer les lignes cochées</button></div>'
   );
   document.getElementById("recalcTickets").addEventListener("click", () => {
     const v = parseInt(document.getElementById("limiteInterv").value, 10);
