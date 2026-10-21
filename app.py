@@ -134,7 +134,7 @@ def api_put_sheet():
 # ---- Ximi : tickets restaurant calculés depuis le planning ----
 # L'API Ximi (api/interventions/all) ne sait pas filtrer par date : comme dans
 # Aid'Aux Suivi, on la lit page par page et on garde en base les interventions
-# récentes (table prepaie_ximi_interventions). Chaque appel de
+# du mois demandé (table prepaie_ximi_interventions). Chaque appel de
 # /api/ximi/rafraichir lit des pages pendant quelques secondes et reprend là où
 # le précédent s'est arrêté (Vercel coupe les requêtes trop longues).
 #
@@ -146,8 +146,6 @@ def api_put_sheet():
 # 6 h ou plus dans la journée = 1 ticket. Les formations ne sont pas lisibles
 # par l'API (accès refusé) : elles restent à ajouter à la main.
 XIMI_STATUT_ANNULE = -3
-XIMI_JOURS_AVANT = 100   # on garde ~3 mois en arrière...
-XIMI_JOURS_APRES = 62    # ... et 2 mois en avant (prestations prévues)
 SEUIL_TICKET_MIN = 6 * 60
 TRIS_XIMI = ["Start desc", "-Start", "Start:desc", "StartDesc"]
 MOIS_FR = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août",
@@ -223,17 +221,22 @@ def api_ximi_rafraichir():
     t0 = time.time()
     offset = 0
     maintenant = datetime.now()
-    bas = maintenant - timedelta(days=XIMI_JOURS_AVANT)
-    haut = maintenant + timedelta(days=XIMI_JOURS_APRES)
+    # Mois par mois : on ne garde (et, si Ximi trie par date, on ne lit) que le
+    # mois affiché dans Pré-paie. Chaque mois a sa propre progression.
+    bornes = _mois_bornes(request.args.get("mois"))
+    if not bornes:
+        return jsonify({"ok": False, "erreur": "Mois illisible"}), 400
+    bas, haut = bornes
+    k = "_" + request.args.get("mois", "").strip().lower()
     conn = auth._conn()
     try:
         with conn.cursor() as cur:
-            offset = int(_etat(cur, "offset", 0))
-            fini_le = _dt_ximi(_etat(cur, "dernier_tour_iso"))
+            offset = int(_etat(cur, "offset" + k, 0))
+            fini_le = _dt_ximi(_etat(cur, "dernier_tour_iso" + k))
             if offset == 0 and fini_le and not request.args.get("force") \
                     and maintenant - fini_le < timedelta(minutes=20):
                 return jsonify({"ok": True, "termine": True, "lues": 0,
-                                "dernier_tour": _etat(cur, "dernier_tour")})
+                                "dernier_tour": _etat(cur, "dernier_tour" + k)})
             # Tri par date décroissante, si Ximi l'accepte : on s'arrête alors dès
             # qu'on atteint des interventions trop anciennes au lieu de relire
             # tout l'historique. On essaie une syntaxe par appel (Vercel coupe à ~10 s).
@@ -253,7 +256,7 @@ def api_ximi_rafraichir():
                         pass
                     if ok:
                         _set_etat(cur, "tri", essais[0])
-                        _set_etat(cur, "offset", 0)  # nouvel ordre : on repart du début
+                        _set_etat(cur, "offset" + k, 0)  # nouvel ordre : on repart du début
                         offset = 0
                     else:
                         _set_etat(cur, "tris_rates", (_etat(cur, "tris_rates") or "") + "|" + essais[0])
@@ -263,7 +266,7 @@ def api_ximi_rafraichir():
                 _set_etat(cur, "tri", "")
                 tri = ""
             if offset == 0:
-                _set_etat(cur, "debut_tour", maintenant.isoformat())
+                _set_etat(cur, "debut_tour" + k, maintenant.isoformat())
             termine, pages = False, 0
             # Vercel coupe une requête au bout de ~10 s : petites pages, pas de
             # nouvelle page après 2 s, une page trop lente est abandonnée.
@@ -277,7 +280,7 @@ def api_ximi_rafraichir():
                 lignes = []
                 for it in items:
                     debut, fin = _dt_ximi(it.get("Start")), _dt_ximi(it.get("End"))
-                    if not debut or not fin or not (bas <= debut <= haut):
+                    if not debut or not fin or not (bas <= debut < haut):
                         continue
                     agent = it.get("Agent") or {}
                     lignes.append((it.get("Id"), agent.get("Id"),
@@ -301,20 +304,22 @@ def api_ximi_rafraichir():
                     break
             if termine:
                 # tour complet : on oublie ce qui n'existe plus dans Ximi et ce qui est trop vieux
-                cur.execute("DELETE FROM prepaie_ximi_interventions WHERE vu_le < %s",
-                            (_etat(cur, "debut_tour", maintenant.isoformat()),))
-                cur.execute("DELETE FROM prepaie_ximi_interventions WHERE debut < %s", (bas,))
-                _set_etat(cur, "dernier_tour", _heure_paris().strftime("%d/%m/%Y %H:%M"))
-                _set_etat(cur, "dernier_tour_iso", maintenant.isoformat())
-                _set_etat(cur, "offset", 0)
+                cur.execute("""DELETE FROM prepaie_ximi_interventions
+                               WHERE debut >= %s AND debut < %s AND vu_le < %s""",
+                            (bas, haut, _etat(cur, "debut_tour" + k, maintenant.isoformat())))
+                cur.execute("DELETE FROM prepaie_ximi_interventions WHERE debut < %s",
+                            (maintenant - timedelta(days=400),))
+                _set_etat(cur, "dernier_tour" + k, _heure_paris().strftime("%d/%m/%Y %H:%M"))
+                _set_etat(cur, "dernier_tour_iso" + k, maintenant.isoformat())
+                _set_etat(cur, "offset" + k, 0)
             else:
-                _set_etat(cur, "offset", offset)
-            dernier = _etat(cur, "dernier_tour")
+                _set_etat(cur, "offset" + k, offset)
+            dernier = _etat(cur, "dernier_tour" + k)
         conn.commit()
     except Exception as e:
         # page Ximi trop lente ou refusée : on garde ce qui est lu, le navigateur réessaie
         with conn.cursor() as cur:
-            _set_etat(cur, "offset", offset)
+            _set_etat(cur, "offset" + k, offset)
         conn.commit()
         return jsonify({"ok": False, "erreur": str(e)[:400], "lues": offset}), 502
     finally:
@@ -377,7 +382,7 @@ def api_ximi_tickets():
                 (bornes[0], bornes[1], XIMI_STATUT_ANNULE),
             )
             rows = cur.fetchall()
-            dernier = _etat(cur, "dernier_tour")
+            dernier = _etat(cur, "dernier_tour_" + request.args.get("mois", "").strip().lower())
     finally:
         conn.close()
     par_agent = {}

@@ -1412,7 +1412,7 @@ function fenetreTickets(contenu) {
   return fond;
 }
 
-async function rafraichirXimi(majTexte, force) {
+async function rafraichirXimi(majTexte, force, mois) {
   // l'API Ximi se lit par morceaux : on rappelle le serveur jusqu'à la fin du tour
   // Un appel bloqué ou refusé (Ximi lent, coupure Vercel) est réessayé ; on
   // abandonne après 5 échecs d'affilée.
@@ -1423,7 +1423,7 @@ async function rafraichirXimi(majTexte, force) {
     const minuteur = setTimeout(() => ctl.abort(), 25000);
     let d = {}, ok = false;
     try {
-      const r = await fetch("/api/ximi/rafraichir" + (force && i === 0 ? "?force=1" : ""),
+      const r = await fetch("/api/ximi/rafraichir?mois=" + encodeURIComponent(mois) + (force && i === 0 ? "&force=1" : ""),
                             { method: "POST", signal: ctl.signal });
       d = await r.json().catch(() => ({}));
       ok = r.ok && d.ok;
@@ -1452,7 +1452,7 @@ async function calculerTicketsXimi(force) {
   const majTexte = t => { const el = document.getElementById("ticketsEtat"); if (el) el.textContent = t; };
   let data;
   try {
-    await rafraichirXimi(majTexte, force === true);
+    await rafraichirXimi(majTexte, force === true, sheetMois);
     majTexte("Calcul…");
     const r = await fetch("/api/ximi/tickets?mois=" + encodeURIComponent(sheetMois) + "&limite=" + limiteIntervacation());
     data = await r.json();
