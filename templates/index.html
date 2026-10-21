@@ -1414,12 +1414,34 @@ function fenetreTickets(contenu) {
 
 async function rafraichirXimi(majTexte, force) {
   // l'API Ximi se lit par morceaux : on rappelle le serveur jusqu'à la fin du tour
-  for (let i = 0; i < 300; i++) {
-    const r = await fetch("/api/ximi/rafraichir" + (force ? "?force=1" : ""), { method: "POST" });
-    const d = await r.json().catch(() => ({}));
-    if (!r.ok || !d.ok) throw new Error(d.erreur || ("Erreur " + r.status));
-    majTexte("Lecture du planning Ximi… " + d.lues + " interventions parcourues");
-    if (d.termine) return;
+  // Un appel bloqué ou refusé (Ximi lent, coupure Vercel) est réessayé ; on
+  // abandonne après 5 échecs d'affilée.
+  const t0 = Date.now();
+  let echecs = 0, derniere = "";
+  for (let i = 0; i < 2000; i++) {
+    const ctl = new AbortController();
+    const minuteur = setTimeout(() => ctl.abort(), 25000);
+    let d = {}, ok = false;
+    try {
+      const r = await fetch("/api/ximi/rafraichir" + (force && i === 0 ? "?force=1" : ""),
+                            { method: "POST", signal: ctl.signal });
+      d = await r.json().catch(() => ({}));
+      ok = r.ok && d.ok;
+      if (!ok) derniere = d.erreur || ("Erreur " + r.status);
+    } catch (e) {
+      derniere = "pas de réponse du serveur";
+    }
+    clearTimeout(minuteur);
+    const sec = Math.round((Date.now() - t0) / 1000);
+    if (ok) {
+      echecs = 0;
+      majTexte("Lecture du planning Ximi… " + d.lues + " interventions parcourues (" + sec + " s)");
+      if (d.termine) return;
+    } else {
+      echecs++;
+      if (echecs >= 5) throw new Error(derniere);
+      majTexte("Lecture du planning Ximi… nouvel essai (" + echecs + "/5, " + sec + " s)");
+    }
   }
 }
 
