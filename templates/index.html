@@ -945,9 +945,10 @@ async function reprendreNon(agence, mois, rows, depth) {
   const prev = nomMois(idx - 1);
   await ensureSheetLoaded(agence, prev, depth + 1);
   const prevRows = (store[agence] || {})[prev] || [];
-  const nonPrec = {}, contratPrec = {};
+  const nonPrec = {}, contratPrec = {}, embauchePrec = {};
   prevRows.forEach(r => {
     const cle = nomCle(r.nom);
+    if (String(r.embauche || "").trim()) embauchePrec[cle] = String(r.embauche).trim();
     const m = r._hl && r._hl.trNbre;
     if (TICKET_MARKS.indexOf(m) >= 0) nonPrec[cle] = m;
     // Avenant coché CDI = devient le contrat des mois suivants.
@@ -960,6 +961,11 @@ async function reprendreNon(agence, mois, rows, depth) {
   rows.forEach(r => {
     if (!r._hl) r._hl = {};
     const cle = nomCle(r.nom);
+    // date d'embauche vide : reprise du mois d'avant (même nom)
+    if (!String(r.embauche || "").trim() && embauchePrec[cle]) {
+      r.embauche = embauchePrec[cle];
+      change = true;
+    }
     if (!r._nonRepris) {
       const m = nonPrec[cle];
       if (m && !r._hl.trNbre) { r._hl.trNbre = m; r.trNbre = ""; }
@@ -998,7 +1004,18 @@ async function ensureSheetLoaded(agence, mois, depth) {
   // Rien côté serveur : on amorce depuis le trousseau de l'agence, en
   // mémoire seulement (on n'écrit rien tant que personne n'a rien tapé,
   // pour ne jamais bloquer un futur import de vraies données).
-  store[agence][mois] = AGENCES[agence].salaries.map(s => emptyRow(s));
+  // À partir d'octobre 2026, on part de la liste du mois d'avant (noms, dates
+  // d'embauche, contrats à jour) plutôt que de la liste de départ, qui n'a pas
+  // toutes les dates d'embauche.
+  let depart = AGENCES[agence].salaries;
+  const idx = moisIndex(mois);
+  if (idx >= moisIndex("Octobre 2026") && depth <= 12) {
+    const prev = nomMois(idx - 1);
+    await ensureSheetLoaded(agence, prev, depth + 1);
+    const prevRows = ((store[agence] || {})[prev] || []).filter(r => String(r.nom || "").trim());
+    if (prevRows.length) depart = prevRows.map(r => [r.nom, r.embauche, r.contrat]);
+  }
+  store[agence][mois] = depart.map(s => emptyRow(s));
   // feuille pas encore créée : « NON » repris en mémoire seulement (ils
   // seront enregistrés avec la première saisie)
   await reprendreNon(agence, mois, store[agence][mois], depth);
