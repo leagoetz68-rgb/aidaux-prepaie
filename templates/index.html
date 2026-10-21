@@ -1485,11 +1485,13 @@ async function calculerTicketsXimi(force) {
     return '<tr style="border-bottom:1px solid #e3e6ee;vertical-align:top;">'
       + '<td style="padding:6px 4px;">' + (modifiable ? '<input type="checkbox" data-i="' + i + '"' + (coche ? " checked" : "") + '>' : "") + '</td>'
       + '<td style="padding:6px 4px;"><b>' + h(l.r.nom) + '</b>'
-      + (detail ? '<details><summary style="cursor:pointer;color:#5b6478;font-size:12px;">détail par jour</summary><div style="font-size:12px;margin-top:4px;">' + detail + '</div></details>' : "")
+      + (detail ? '<br><button type="button" class="voirJours" data-i="' + i + '" style="margin-top:3px;border:1px solid #c9d3e3;background:#f4f7fb;border-radius:5px;padding:2px 8px;font-size:12px;cursor:pointer;">📅 Voir les jours</button>' : "")
       + '</td>'
       + '<td style="padding:6px 4px;text-align:center;">' + h(l.r.trNbre || "—") + '</td>'
       + '<td style="padding:6px 4px;text-align:center;font-weight:700;">' + (l.a && !l.non && !l.bloque ? l.propose : "") + '</td>'
-      + '<td style="padding:6px 4px;">' + etat + '</td></tr>';
+      + '<td style="padding:6px 4px;">' + etat + '</td></tr>'
+      + (detail ? '<tr id="jours-' + i + '" style="display:none;"><td></td><td colspan="4" style="padding:4px 4px 10px;font-size:12px;text-align:left;">'
+        + '<div style="color:#5b6478;margin-bottom:3px;">Total par jour (✓ = 6 h ou plus = 1 ticket) :</div>' + detail + '</td></tr>' : "");
   }).join("");
 
   fenetreTickets(
@@ -1512,6 +1514,12 @@ async function calculerTicketsXimi(force) {
     if (v >= 0) { try { localStorage.setItem(LIMITE_KEY, String(v)); } catch (e) {} }
     calculerTicketsXimi();
   });
+  document.querySelectorAll("#ticketsXimi .voirJours").forEach(b => b.addEventListener("click", () => {
+    const tr = document.getElementById("jours-" + b.dataset.i);
+    const ouvert = tr.style.display !== "none";
+    tr.style.display = ouvert ? "none" : "";
+    b.textContent = ouvert ? "📅 Voir les jours" : "📅 Masquer les jours";
+  }));
   document.getElementById("relireXimi").addEventListener("click", e => { e.preventDefault(); calculerTicketsXimi(true); });
   document.getElementById("appliquerTickets").addEventListener("click", () => {
     let n = 0;
