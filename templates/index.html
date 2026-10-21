@@ -461,6 +461,7 @@ tbody td.cdicdd-td{padding:0 8px;width:1%;white-space:nowrap;text-align:center}
       <div class="spacer"></div>
       <button class="btn ghost" id="addRow2">＋ Ajouter un salarié</button>
       <button class="btn secondary" id="exportCsv">⬇ Export CSV</button>
+      <button class="btn secondary" id="calcTickets" title="Calcule les tickets resto depuis le planning Ximi">🧮 Calculer tickets (Ximi)</button>
       <button class="btn secondary" id="exportTickets" title="Fichier à envoyer pour la commande des tickets resto">🍽 Commande tickets resto</button>
       <button class="btn ghost" id="printBtn">🖨 Imprimer</button>
     </div>
@@ -1381,6 +1382,133 @@ function exportTickets() {
   w.document.close();
 }
 
+// ---- Tickets resto calculés depuis le planning Ximi ----
+// Par jour : prestations (hors annulées) + intervacations (trou entre deux
+// prestations ≤ limite) ; 6 h ou plus = 1 ticket. Le calcul se fait côté
+// serveur (/api/ximi/tickets) ; ici on affiche la proposition et on ne remplit
+// la case qu'après validation. Les salariés « NON » ou pas encore éligibles
+// ne sont jamais modifiés.
+const LIMITE_KEY = "aidaux_prepaie_limite_intervacation";
+function limiteIntervacation() {
+  try { const v = parseInt(localStorage.getItem(LIMITE_KEY), 10); if (v >= 0) return v; } catch (e) {}
+  return 120;
+}
+function hMin(m) { return Math.floor(m / 60) + "h" + String(m % 60).padStart(2, "0"); }
+
+function fenetreTickets(contenu) {
+  let fond = document.getElementById("ticketsXimi");
+  if (!fond) {
+    fond = document.createElement("div");
+    fond.id = "ticketsXimi";
+    fond.style.cssText = "position:fixed;inset:0;background:rgba(20,30,50,.45);z-index:1000;display:flex;align-items:flex-start;justify-content:center;padding:24px 12px;overflow:auto;";
+    fond.addEventListener("click", e => { if (e.target === fond) fond.remove(); });
+    document.body.appendChild(fond);
+  }
+  fond.innerHTML = '<div style="background:#fff;border-radius:10px;max-width:760px;width:100%;padding:20px 22px;box-shadow:0 10px 40px rgba(0,0,0,.25);font-size:14px;">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px;">'
+    + '<h2 style="margin:0;font-size:18px;">🧮 Tickets resto depuis Ximi — ' + AGENCES[curAgence].nom + ' · ' + curMois + '</h2>'
+    + '<button class="btn ghost" onclick="document.getElementById(\'ticketsXimi\').remove()">✕</button></div>'
+    + contenu + '</div>';
+  return fond;
+}
+
+async function rafraichirXimi(majTexte, force) {
+  // l'API Ximi se lit par morceaux : on rappelle le serveur jusqu'à la fin du tour
+  for (let i = 0; i < 300; i++) {
+    const r = await fetch("/api/ximi/rafraichir" + (force ? "?force=1" : ""), { method: "POST" });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) throw new Error(d.erreur || ("Erreur " + r.status));
+    majTexte("Lecture du planning Ximi… " + d.lues + " interventions parcourues");
+    if (d.termine) return;
+  }
+}
+
+async function calculerTicketsXimi(force) {
+  const sheetAgence = curAgence, sheetMois = curMois;
+  const fond = fenetreTickets('<p id="ticketsEtat">Lecture du planning Ximi…</p>');
+  const majTexte = t => { const el = document.getElementById("ticketsEtat"); if (el) el.textContent = t; };
+  let data;
+  try {
+    await rafraichirXimi(majTexte, force === true);
+    majTexte("Calcul…");
+    const r = await fetch("/api/ximi/tickets?mois=" + encodeURIComponent(sheetMois) + "&limite=" + limiteIntervacation());
+    data = await r.json();
+    if (!r.ok || !data.ok) throw new Error(data.erreur || ("Erreur " + r.status));
+  } catch (e) {
+    fenetreTickets('<p style="color:#b42318;">⚠ Impossible de lire Ximi : ' + String(e.message || e).replace(/</g, "&lt;") + '</p>');
+    return;
+  }
+  if (sheetAgence !== curAgence || sheetMois !== curMois) return; // on a changé de feuille entre-temps
+
+  const rows = getSheet(curAgence, curMois);
+  const lignes = rows.filter(r => String(r.nom || "").trim()).map(r => {
+    const cle = cleNomXimi(r.nom);
+    const a = data.agents[cle];
+    const non = TICKET_MARKS.indexOf((r._hl || {}).trNbre) >= 0;
+    const bloque = !ticketDebloque(r.embauche, curMois);
+    return { r, a, non, bloque, propose: a ? a.tickets : null };
+  });
+  const h = v => String(v == null ? "" : v).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+  const trs = lignes.map((l, i) => {
+    let etat, coche = false;
+    if (l.non) etat = '<span style="color:#8a92a6;">« NON » — inchangé</span>';
+    else if (l.bloque) etat = '<span style="color:#8a92a6;">pas encore éligible — inchangé</span>';
+    else if (!l.a) etat = '<span style="color:#b45309;">introuvable dans Ximi (ou aucune prestation)</span>';
+    else { etat = ""; coche = String(l.propose) !== String(l.r.trNbre || "").trim(); }
+    const detail = l.a ? l.a.jours.map(j =>
+      '<span style="display:inline-block;margin:1px 4px 1px 0;padding:1px 5px;border-radius:4px;background:' + (j.ticket ? "#e3f3e8" : "#f2f4f7") + ';">'
+      + j.date.slice(8, 10) + '/' + j.date.slice(5, 7) + ' ' + hMin(j.minutes) + (j.ticket ? " ✓" : "") + '</span>').join("") : "";
+    const modifiable = !l.non && !l.bloque && l.a;
+    return '<tr style="border-bottom:1px solid #e3e6ee;vertical-align:top;">'
+      + '<td style="padding:6px 4px;">' + (modifiable ? '<input type="checkbox" data-i="' + i + '"' + (coche ? " checked" : "") + '>' : "") + '</td>'
+      + '<td style="padding:6px 4px;"><b>' + h(l.r.nom) + '</b>'
+      + (detail ? '<details><summary style="cursor:pointer;color:#5b6478;font-size:12px;">détail par jour</summary><div style="font-size:12px;margin-top:4px;">' + detail + '</div></details>' : "")
+      + '</td>'
+      + '<td style="padding:6px 4px;text-align:center;">' + h(l.r.trNbre || "—") + '</td>'
+      + '<td style="padding:6px 4px;text-align:center;font-weight:700;">' + (l.a && !l.non && !l.bloque ? l.propose : "") + '</td>'
+      + '<td style="padding:6px 4px;">' + etat + '</td></tr>';
+  }).join("");
+
+  fenetreTickets(
+    '<p style="margin:0 0 8px;color:#5b6478;">Par jour : prestations (hors annulées) + intervacations. 6 h ou plus = 1 ticket. '
+    + 'Les <b>formations</b> ne sont pas lisibles dans Ximi par l\'API : à ajouter à la main.'
+    + (data.dernier_tour ? ' Planning lu le ' + h(data.dernier_tour) + '.' : '')
+    + ' <a href="#" id="relireXimi">Relire Ximi maintenant</a></p>'
+    + '<p style="margin:0 0 10px;">Un trou entre deux prestations compte comme intervacation jusqu\'à '
+    + '<input id="limiteInterv" type="number" min="0" max="600" step="5" value="' + limiteIntervacation() + '" style="width:64px;"> min '
+    + '<button class="btn ghost" id="recalcTickets" style="padding:4px 10px;">Recalculer</button></p>'
+    + '<div style="overflow:auto;"><table style="width:100%;border-collapse:collapse;">'
+    + '<thead><tr style="text-align:left;border-bottom:2px solid #1f2a44;"><th></th><th>Salarié</th><th style="text-align:center;">Actuel</th><th style="text-align:center;">Proposé</th><th></th></tr></thead>'
+    + '<tbody>' + trs + '</tbody></table></div>'
+    + '<div style="margin-top:14px;display:flex;gap:10px;justify-content:flex-end;">'
+    + '<button class="btn ghost" onclick="document.getElementById(\'ticketsXimi\').remove()">Annuler</button>'
+    + '<button class="btn" id="appliquerTickets">Appliquer les lignes cochées</button></div>'
+  );
+  document.getElementById("recalcTickets").addEventListener("click", () => {
+    const v = parseInt(document.getElementById("limiteInterv").value, 10);
+    if (v >= 0) { try { localStorage.setItem(LIMITE_KEY, String(v)); } catch (e) {} }
+    calculerTicketsXimi();
+  });
+  document.getElementById("relireXimi").addEventListener("click", e => { e.preventDefault(); calculerTicketsXimi(true); });
+  document.getElementById("appliquerTickets").addEventListener("click", () => {
+    let n = 0;
+    document.querySelectorAll("#ticketsXimi input[type=checkbox][data-i]").forEach(cb => {
+      if (!cb.checked) return;
+      const l = lignes[+cb.dataset.i];
+      l.r.trNbre = String(l.propose);
+      n++;
+    });
+    document.getElementById("ticketsXimi").remove();
+    if (n) { saveStore(); render(); }
+  });
+}
+
+// même clé que _cle_nom() côté serveur : sans accents, minuscules, mots triés
+function cleNomXimi(nom) {
+  const t = String(nom || "").normalize("NFKD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  return (t.match(/[a-z]+/g) || []).sort().join(" ");
+}
+
 function renderTabs() {
   const bar = document.getElementById("tabs");
   bar.innerHTML = "";
@@ -1426,6 +1554,7 @@ function initControls() {
   document.getElementById("addRow2").addEventListener("click", addRow);
   document.getElementById("exportCsv").addEventListener("click", exportCsv);
   document.getElementById("exportTickets").addEventListener("click", exportTickets);
+  document.getElementById("calcTickets").addEventListener("click", calculerTicketsXimi);
   document.getElementById("printBtn").addEventListener("click", () => window.print());
 }
 
