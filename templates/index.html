@@ -139,8 +139,15 @@
   }
   .btn:hover { background: #e8390c; transform: translateY(-1px); }
   .btn:active { transform: translateY(0); }
-  .btn.secondary { background: var(--teal-dark); box-shadow: 0 4px 12px rgba(16,26,107,.25); }
-  .btn.secondary:hover { background: #000b6e; }
+  .btn.secondary {
+    background: #e6f7f6; color: var(--teal-dark); box-shadow: none;
+    border: 1px solid #bfe9e6;
+  }
+  .btn.secondary:hover { background: var(--teal-dark); color: #fff; border-color: var(--teal-dark); }
+  .btn .ic {
+    width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  }
   .btn.ghost {
     background: #fff; color: var(--indigo);
     border: 1px solid var(--border-strong); box-shadow: none;
@@ -486,13 +493,13 @@ tbody td.cdicdd-td{padding:0 8px;width:1%;white-space:nowrap;text-align:center}
         <label for="mois">Mois</label>
         <div class="select-wrap"><select id="mois"></select></div>
       </div>
-      <button class="btn ghost" id="addMois" title="Ajouter le mois suivant">＋ Mois suivant</button>
+      <button class="btn ghost" id="addMois" title="Ajouter le mois suivant"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Mois suivant</button>
       <div class="spacer"></div>
-      <button class="btn ghost" id="addRow2">＋ Ajouter un salarié</button>
-      <button class="btn secondary" id="exportCsv">⬇ Export CSV</button>
-      <button class="btn secondary" id="calcTickets" title="Calcule les tickets resto depuis le planning Ximi">🧮 Calculer tickets (Ximi)</button>
-      <button class="btn secondary" id="exportTickets" title="Fichier à envoyer pour la commande des tickets resto">🍽 Commande tickets resto</button>
-      <button class="btn ghost" id="printBtn">🖨 Imprimer</button>
+      <button class="btn ghost" id="addRow2"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Ajouter un salarié</button>
+      <button class="btn secondary" id="exportCsv"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>Export CSV</button>
+      <button class="btn secondary" id="calcTickets" title="Calcule les tickets resto depuis le planning Ximi"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 12h.01M12 12h.01M16 12h.01M8 16h.01M12 16h.01M16 16h.01"/></svg>Calculer tickets (Ximi)</button>
+      <button class="btn secondary" id="exportTickets" title="Fichier à envoyer pour la commande des tickets resto"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8a2 2 0 0 0 2-2h12a2 2 0 0 0 2 2v8a2 2 0 0 0-2 2H6a2 2 0 0 0-2-2z"/><path d="M10 6v12" stroke-dasharray="2 2"/></svg>Commande tickets resto</button>
+      <button class="btn ghost" id="printBtn"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 9V4h10v5M7 17H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2"/><rect x="7" y="14" width="10" height="7" rx="1"/></svg>Imprimer</button>
     </div>
 
     <div class="stats">
