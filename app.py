@@ -220,6 +220,7 @@ def api_ximi_rafraichir():
     import ximi
 
     t0 = time.time()
+    offset = 0
     maintenant = datetime.now()
     bas = maintenant - timedelta(days=XIMI_JOURS_AVANT)
     haut = maintenant + timedelta(days=XIMI_JOURS_APRES)
@@ -235,8 +236,11 @@ def api_ximi_rafraichir():
             if offset == 0:
                 _set_etat(cur, "debut_tour", maintenant.isoformat())
             termine, pages = False, 0
-            while time.time() - t0 < 7:
-                res = ximi.get("api/interventions/all", {"Top": 1000, "Offset": offset}, timeout=20)
+            # Vercel coupe une requête au bout de ~10 s : on ne commence pas de
+            # nouvelle page après 4 s, et une page trop lente est abandonnée.
+            while time.time() - t0 < 4:
+                res = ximi.get("api/interventions/all", {"Top": 1000, "Offset": offset,
+                                                          "ComputeHasMoreRows": "true"}, timeout=5)
                 items = res.get("Results", []) if isinstance(res, dict) else []
                 pages += 1
                 lignes = []
@@ -275,8 +279,11 @@ def api_ximi_rafraichir():
             dernier = _etat(cur, "dernier_tour")
         conn.commit()
     except Exception as e:
-        conn.rollback()
-        return jsonify({"ok": False, "erreur": str(e)[:400]}), 502
+        # page Ximi trop lente ou refusée : on garde ce qui est lu, le navigateur réessaie
+        with conn.cursor() as cur:
+            _set_etat(cur, "offset", offset)
+        conn.commit()
+        return jsonify({"ok": False, "erreur": str(e)[:400], "lues": offset}), 502
     finally:
         conn.close()
     return jsonify({"ok": True, "termine": termine, "lues": offset, "dernier_tour": dernier})
