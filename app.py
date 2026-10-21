@@ -131,110 +131,229 @@ def api_put_sheet():
 # d'un simple clic, a été retirée.)
 
 
-# ---- Ximi : diagnostic du planning (étape 1 des tickets restaurant) ----
-# Cherche dans la documentation de l'API Ximi les adresses qui donnent le
-# planning d'un intervenant (interventions, trajets, absences, formations...)
-# et montre à quoi ressemblent les données pour un intervenant et un jour.
-@app.route("/admin/ximi-planning")
-def ximi_planning_diagnostic():
-    """Diagnostic n°2 : lit les interventions d'un jour dans Ximi et montre
-    leur structure (noms de champs, horaires, statuts), sans données personnelles."""
-    from concurrent.futures import ThreadPoolExecutor
-    import requests as rq
+# ---- Ximi : tickets restaurant calculés depuis le planning ----
+# L'API Ximi (api/interventions/all) ne sait pas filtrer par date : comme dans
+# Aid'Aux Suivi, on la lit page par page et on garde en base les interventions
+# récentes (table prepaie_ximi_interventions). Chaque appel de
+# /api/ximi/rafraichir lit des pages pendant quelques secondes et reprend là où
+# le précédent s'est arrêté (Vercel coupe les requêtes trop longues).
+#
+# Règle des tickets (définie avec Léa) : par jour, on additionne
+#   - les prestations faites ou prévues (pas les annulées, statut -3),
+#   - les intervacations = le temps entre la fin d'une prestation et le début
+#     de la suivante, si ce trou ne dépasse pas la limite réglable (sinon c'est
+#     une coupure / un retour au domicile, qui ne compte pas).
+# 6 h ou plus dans la journée = 1 ticket. Les formations ne sont pas lisibles
+# par l'API (accès refusé) : elles restent à ajouter à la main.
+XIMI_STATUT_ANNULE = -3
+XIMI_JOURS_AVANT = 100   # on garde ~3 mois en arrière...
+XIMI_JOURS_APRES = 62    # ... et 2 mois en avant (prestations prévues)
+SEUIL_TICKET_MIN = 6 * 60
+MOIS_FR = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août",
+           "septembre", "octobre", "novembre", "décembre"]
+
+
+def init_ximi_db():
+    conn = auth._conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS prepaie_ximi_interventions (
+                    id BIGINT PRIMARY KEY,
+                    agent_id BIGINT,
+                    agent_nom TEXT,
+                    debut TIMESTAMP,
+                    fin TIMESTAMP,
+                    statut INTEGER,
+                    vu_le TIMESTAMPTZ NOT NULL DEFAULT now()
+                )
+                """
+            )
+            cur.execute(
+                "CREATE TABLE IF NOT EXISTS prepaie_ximi_etat (cle TEXT PRIMARY KEY, valeur TEXT)"
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+init_ximi_db()
+
+
+def _etat(cur, cle, defaut=None):
+    cur.execute("SELECT valeur FROM prepaie_ximi_etat WHERE cle = %s", (cle,))
+    row = cur.fetchone()
+    return row[0] if row else defaut
+
+
+def _set_etat(cur, cle, valeur):
+    cur.execute(
+        """INSERT INTO prepaie_ximi_etat (cle, valeur) VALUES (%s, %s)
+           ON CONFLICT (cle) DO UPDATE SET valeur = EXCLUDED.valeur""",
+        (cle, str(valeur)),
+    )
+
+
+def _heure_paris():
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    return datetime.now(ZoneInfo("Europe/Paris"))
+
+
+def _dt_ximi(texte):
+    from datetime import datetime
+    try:
+        return datetime.fromisoformat(str(texte or "")[:19])
+    except ValueError:
+        return None
+
+
+@app.route("/api/ximi/rafraichir", methods=["POST"])
+def api_ximi_rafraichir():
+    """Lit des pages d'interventions Ximi pendant ~7 s. À rappeler tant que
+    « termine » vaut false. Si un tour complet date de moins de 20 min, rien à
+    relire (sauf ?force=1)."""
+    import time
+    from datetime import datetime, timedelta
+    from psycopg2.extras import execute_values
     import ximi
 
-    nom = (request.args.get("intervenant") or "").strip().lower()
-    prenom = (request.args.get("prenom") or "").strip().lower()
-    jour = (request.args.get("date") or "").strip()  # aaaa-mm-jj
-    res = {"aide": "?intervenant=AMIRI&prenom=Saeideh&date=2026-10-20", "date": jour}
+    t0 = time.time()
+    maintenant = datetime.now()
+    bas = maintenant - timedelta(days=XIMI_JOURS_AVANT)
+    haut = maintenant + timedelta(days=XIMI_JOURS_APRES)
+    conn = auth._conn()
     try:
-        entetes = ximi._headers()
+        with conn.cursor() as cur:
+            offset = int(_etat(cur, "offset", 0))
+            fini_le = _dt_ximi(_etat(cur, "dernier_tour_iso"))
+            if offset == 0 and fini_le and not request.args.get("force") \
+                    and maintenant - fini_le < timedelta(minutes=20):
+                return jsonify({"ok": True, "termine": True, "lues": 0,
+                                "dernier_tour": _etat(cur, "dernier_tour")})
+            if offset == 0:
+                _set_etat(cur, "debut_tour", maintenant.isoformat())
+            termine, pages = False, 0
+            while time.time() - t0 < 7:
+                res = ximi.get("api/interventions/all", {"Top": 1000, "Offset": offset}, timeout=20)
+                items = res.get("Results", []) if isinstance(res, dict) else []
+                pages += 1
+                lignes = []
+                for it in items:
+                    debut, fin = _dt_ximi(it.get("Start")), _dt_ximi(it.get("End"))
+                    if not debut or not fin or not (bas <= debut <= haut):
+                        continue
+                    agent = it.get("Agent") or {}
+                    lignes.append((it.get("Id"), agent.get("Id"),
+                                   (agent.get("DisplayName") or "").strip(),
+                                   debut, fin, it.get("Status")))
+                if lignes:
+                    execute_values(cur, """
+                        INSERT INTO prepaie_ximi_interventions
+                            (id, agent_id, agent_nom, debut, fin, statut)
+                        VALUES %s
+                        ON CONFLICT (id) DO UPDATE SET
+                            agent_id = EXCLUDED.agent_id, agent_nom = EXCLUDED.agent_nom,
+                            debut = EXCLUDED.debut, fin = EXCLUDED.fin,
+                            statut = EXCLUDED.statut, vu_le = now()
+                    """, lignes)
+                offset += len(items)
+                if not res.get("HasMoreRows") or not items:
+                    termine = True
+                    break
+            if termine:
+                # tour complet : on oublie ce qui n'existe plus dans Ximi et ce qui est trop vieux
+                cur.execute("DELETE FROM prepaie_ximi_interventions WHERE vu_le < %s",
+                            (_etat(cur, "debut_tour", maintenant.isoformat()),))
+                cur.execute("DELETE FROM prepaie_ximi_interventions WHERE debut < %s", (bas,))
+                _set_etat(cur, "dernier_tour", _heure_paris().strftime("%d/%m/%Y %H:%M"))
+                _set_etat(cur, "dernier_tour_iso", maintenant.isoformat())
+                _set_etat(cur, "offset", 0)
+            else:
+                _set_etat(cur, "offset", offset)
+            dernier = _etat(cur, "dernier_tour")
+        conn.commit()
     except Exception as e:
-        return jsonify({"erreur": "Clés Ximi absentes ou invalides : " + str(e)[:300]})
-    base = ximi.BASE_URL
-    jeton = entetes["Api-Key"]
-    DELAI = 8
+        conn.rollback()
+        return jsonify({"ok": False, "erreur": str(e)[:400]}), 502
+    finally:
+        conn.close()
+    return jsonify({"ok": True, "termine": termine, "lues": offset, "dernier_tour": dernier})
 
-    # Intervenant : nom exact (+ prénom)
-    agent_id = None
+
+def _cle_nom(nom):
+    """'AMIRI, Saeideh' / 'Amiri Saeïdeh' -> 'amiri saeideh' (mots triés)."""
+    import re
+    import unicodedata
+    t = unicodedata.normalize("NFKD", str(nom or "")).encode("ascii", "ignore").decode().lower()
+    return " ".join(sorted(re.findall(r"[a-z]+", t)))
+
+
+def _mois_bornes(mois):
+    """'Octobre 2026' -> (datetime 1er octobre, datetime 1er novembre)."""
+    from datetime import datetime
+    parties = (mois or "").strip().lower().split()
+    if len(parties) != 2 or parties[0] not in MOIS_FR or not parties[1].isdigit():
+        return None
+    m, a = MOIS_FR.index(parties[0]) + 1, int(parties[1])
+    return datetime(a, m, 1), datetime(a + (m == 12), m % 12 + 1, 1)
+
+
+def _minutes_du_jour(creneaux, limite_min):
+    """Prestations + intervacations (trous <= limite) d'une journée, en minutes."""
+    creneaux = sorted(creneaux)
+    fusion = []
+    for d, f in creneaux:  # deux prestations qui se chevauchent ne comptent qu'une fois
+        if fusion and d <= fusion[-1][1]:
+            fusion[-1][1] = max(fusion[-1][1], f)
+        else:
+            fusion.append([d, f])
+    total = sum((f - d).total_seconds() / 60 for d, f in fusion)
+    for (_, f1), (d2, _) in zip(fusion, fusion[1:]):
+        trou = (d2 - f1).total_seconds() / 60
+        if 0 < trou <= limite_min:
+            total += trou
+    return round(total)
+
+
+@app.route("/api/ximi/tickets")
+def api_ximi_tickets():
+    """Tickets proposés pour un mois : {cle_nom: {nom, tickets, jours: [...]}}."""
+    bornes = _mois_bornes(request.args.get("mois"))
+    if not bornes:
+        return jsonify({"ok": False, "erreur": "Mois illisible"}), 400
     try:
-        for a in ximi.get_all("api/agents"):
-            if str(a.get("LastName") or "").strip().lower() == nom and \
-                    (not prenom or str(a.get("FirstName") or "").strip().lower() == prenom):
-                agent_id = a.get("Id")
-                res["intervenant"] = f"{a.get('LastName')} {a.get('FirstName')} (Id {agent_id})"
-                break
-    except Exception as e:
-        res["intervenant_erreur"] = str(e)[:300]
-
-    PERSO = ("name", "phone", "email", "address", "street", "city", "zip", "social", "birth",
-             "comment", "note", "data", "label", "title", "latitude", "longitude")
-
-    def masquer(v, cle=""):
-        """Garde la structure, les dates, nombres, statuts ; masque les textes personnels."""
-        if isinstance(v, dict):
-            return {k: masquer(x, k) for k, x in v.items()}
-        if isinstance(v, list):
-            return [masquer(x, cle) for x in v[:3]]
-        if isinstance(v, str) and any(m in cle.lower() for m in PERSO) and "type" not in cle.lower():
-            return "…" if v else v
-        return v
-
-    def contient(v, valeur):
-        if isinstance(v, dict):
-            return any(contient(x, valeur) for x in v.values())
-        if isinstance(v, list):
-            return any(contient(x, valeur) for x in v)
-        return v == valeur
-
-    debut, fin = jour + "T00:00:00", jour + "T23:59:59"
-    essais = {
-        "interventions/all filter.start": ("api/interventions/all",
-            {"filter.start": debut, "filter.end": fin, "Top": 1000}, {}),
-        "interventions/all Filter.Start": ("api/interventions/all",
-            {"Filter.Start": debut, "Filter.End": fin, "Top": 1000}, {}),
-        "interventions/all request.filter.start": ("api/interventions/all",
-            {"request.filter.start": debut, "request.filter.end": fin, "request.top": 1000}, {}),
-        "interventions Bearer": ("api/interventions",
-            {"startDate": debut, "endDate": fin, "Top": 1000}, {"Authorization": "Bearer " + jeton}),
-        "interventions brut": ("api/interventions",
-            {"startDate": debut, "endDate": fin, "Top": 1000}, {"Authorization": jeton}),
-        "agents/events Bearer": ("api/agents/events",
-            {"StartDate": debut, "EndDate": fin, "Top": 1000}, {"Authorization": "Bearer " + jeton}),
-        "agentAbsences Bearer": ("api/agentAbsences",
-            {"startDate": debut, "endDate": fin, "Top": 1000}, {"Authorization": "Bearer " + jeton}),
-    }
-
-    def essayer(item):
-        nom_essai, (chemin, params, extra) = item
-        try:
-            r = rq.get(f"{base}/{chemin}", headers={**entetes, **extra}, params=params, timeout=DELAI)
-            e = {"code": r.status_code}
-            try:
-                j = r.json()
-            except ValueError:
-                e["reponse"] = r.text[:200]
-                return nom_essai, e
-            lignes = j.get("Results", j) if isinstance(j, dict) else j
-            if not isinstance(lignes, list):
-                e["reponse"] = str(j)[:300]
-                return nom_essai, e
-            e["nb"] = len(lignes)
-            if lignes:
-                e["champs"] = sorted(lignes[0].keys()) if isinstance(lignes[0], dict) else []
-            a_lui = [l for l in lignes if agent_id and contient(l, agent_id)]
-            e["nb_pour_intervenant"] = len(a_lui)
-            e["exemples_intervenant"] = [masquer(l) for l in a_lui[:8]]
-            if not a_lui:
-                e["exemple_quelconque"] = masquer(lignes[0]) if lignes else None
-            return nom_essai, e
-        except Exception as ex:
-            return nom_essai, {"erreur": str(ex)[:200]}
-
-    with ThreadPoolExecutor(max_workers=7) as ex:
-        res["essais"] = dict(ex.map(essayer, essais.items()))
-    return Response(json.dumps(res, ensure_ascii=False, indent=2, default=str),
-                    mimetype="application/json")
+        limite = max(0, min(600, int(request.args.get("limite", 120))))
+    except ValueError:
+        limite = 120
+    conn = auth._conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """SELECT agent_nom, debut, fin FROM prepaie_ximi_interventions
+                   WHERE debut >= %s AND debut < %s AND statut IS DISTINCT FROM %s
+                     AND agent_nom <> ''""",
+                (bornes[0], bornes[1], XIMI_STATUT_ANNULE),
+            )
+            rows = cur.fetchall()
+            dernier = _etat(cur, "dernier_tour")
+    finally:
+        conn.close()
+    par_agent = {}
+    for nom, debut, fin in rows:
+        if fin <= debut:
+            continue
+        a = par_agent.setdefault(_cle_nom(nom), {"nom": nom, "jours": {}})
+        a["jours"].setdefault(debut.date().isoformat(), []).append((debut, fin))
+    resultat = {}
+    for cle, a in par_agent.items():
+        jours = []
+        for jour, creneaux in sorted(a["jours"].items()):
+            minutes = _minutes_du_jour(creneaux, limite)
+            jours.append({"date": jour, "minutes": minutes, "ticket": minutes >= SEUIL_TICKET_MIN})
+        resultat[cle] = {"nom": a["nom"], "tickets": sum(j["ticket"] for j in jours), "jours": jours}
+    return jsonify({"ok": True, "agents": resultat, "dernier_tour": dernier, "limite": limite})
 
 
 # --- Application installable (écran d'accueil iPhone / Android) ---
