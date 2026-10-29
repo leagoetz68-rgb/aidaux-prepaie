@@ -519,6 +519,1947 @@ tbody td.cdicdd-td{padding:0 8px;width:1%;white-space:nowrap;text-align:center}
 
     <div class="legend" id="legend">
       <span><i class="swatch" style="background:#f0f3f6"></i> « dès MM/AA » = ouverture après la période d'essai</span>
+      <span><i class="swatch" style="background:#8fd3ff"></i> double-clic sur une case = surligner en bleu (re-double-clic pour enlever)</span>
+      <span><i class="swatch" style="background:#9a9a9a"></i> clic droit = griser / dégriser (repris les mois suivants)</span>
+      <span class="hint">Ticket resto : déblocage auto après 2 mois d'essai. Double-cliquez la case pour la marquer « NON » (ne bénéficie pas).</span>
+    </div>
+
+    <div class="table-wrap">
+    <table id="grid">
+      <thead id="thead"></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+    </div>
+  </div>
+
+<script>
+"use strict";
+
+// ---- Onglets & colonnes (les onglets partagent la même liste de salariés) ----
+// La colonne « Salarié » (nom) est toujours affichée en premier, la corbeille en dernier.
+const TABS = [
+  {
+    id: "prepaie", label: "Pré-paie",
+    cols: [
+      { key: "embauche",    label: "Date d'embauche" },
+      { key: "contrat",     label: "Contrat" },
+      { key: "avenant",     label: "Avenant",           sub: "nouveau contrat (h)" },
+      { key: "typeContrat", label: "CDI/CDD", type: "cdicdd" },
+      { key: "trNbre",      label: "Ticket resto",      thLabel: "Ticket<br>resto", sub: "nbre", type: "ticket", minWidth: 50 },
+      { key: "titreTr",     label: "Titre de transport", thLabel: "Titre de<br>transport", minWidth: 50 },
+      { key: "forfaitKm",   label: "Forfait KMS" },
+      { key: "kmsPdt",      label: "KMS PDT" },
+      { key: "avNature",    label: "Avantage nature" },
+      { key: "acompte",     label: "Acompte" },
+      { key: "divers",      label: "Divers", minWidth: 480, left: true },
+    ],
+  },
+  {
+    id: "heures", label: "Heures réalisées",
+    cols: [
+      { key: "contrat",   label: "Contrat" },
+      { key: "realisees", label: "Heures réalisées" },
+      { key: "heuresObs", label: "Observations", wide: true },
+    ],
+  },
+  {
+    id: "pertes", label: "Pertes / Dispenses",
+    cols: [
+      { key: "pertesDispense", label: "Perte de mission / Dispense d'intervention", wide: true },
+      { key: "pertesDate",     label: "Date" },
+      { key: "pertesObs",      label: "Divers", wide: true },
+    ],
+  },
+];
+function curTabDef() { return TABS.find(t => t.id === curTab) || TABS[0]; }
+// colonnes réellement rendues : Salarié + colonnes de l'onglet
+function tabColumns() {
+  return [{ key: "nom", type: "name", label: "Salarié" }].concat(curTabDef().cols);
+}
+
+// cycle des couleurs au double-clic (couleurs AID'AUX)
+const HL = ["", "hl-teal", "hl-orange", "hl-navy", "hl-grey", "hl-green", "hl-blue"];
+const TICKET_MARKS = ["hl-orange", "hl-navy"]; // = « ne bénéficie pas »
+
+// ---- Agences & effectifs de départ ----
+const AGENCES = {
+  vendenheim: {
+    nom: "Vendenheim",
+    salaries: [
+      ["ABOUDA Habiba","01/03/2026","104"],
+      ["BILOMBA Séraphine","12/12/2025","151,67"],
+      ["BORAS Ouassila","19/05/2025","40"],
+      ["CAVILLIER Lova","05/08/2026","8,67"],
+      ["CHATILLON Aurélie","12/06/2025","151,67"],
+      ["DEL MINCHONI Victor","01/08/2026","40"],
+      ["ERDOGAN Gulizar","24/03/2026","8,67"],
+      ["GRIESBACH Muriel","11/07/2025","85"],
+      ["HOUSSEIN WABERI Kadra","21/04/2026","8,67"],
+      ["KALT Coralyne","19/05/2026","8,67"],
+      ["KONDZIELA Cassandra","19/01/2026","8,67"],
+      ["MATT Claudia","09/02/2026","8,67"],
+      ["NEUBURGER Laura","03/11/2025","40"],
+      ["ONIMUS Claire","04/08/2026","8,67"],
+      ["RAUSER Sony","06/03/2026","151,67"],
+      ["RINK Aurélie","03/02/2026","8,67"],
+      ["TEKIN Dilek","13/12/2025","8,67"],
+      ["WEBER Angèle","01/06/2026","8,67"],
+      ["WELSCH Andréia","01/07/2026","8,67"],
+    ],
+  },
+  cronenbourg: {
+    nom: "Cronenbourg",
+    salaries: [
+      ["Acker Tatiana","","151,67"],["Akhonzada Abduljabar","","104"],["Amiri Saiedeh","","104"],
+      ["Bakemba Prisca","","120"],["Blanchet Yoann","","151,67"],["Bonnet Solange","","26"],
+      ["Bouzagloui Nadia","","15"],["Broladze Mariami","","104"],["Cadoni Laura","","150,4"],
+      ["Deutsch Maëva","","115"],["Diaboungana, Sylvie","","65"],["Diadhiou Chantal","","130"],
+      ["Diallo Djeinabou","","151,67"],["Dietrich, Aurore","","130"],["Dingeldein, Prescilla","","80"],
+      ["Dix Annie","","151,67"],["Donati Anastasia","","60"],["Duchene Monique","","120"],
+      ["El Aydi Asmae","","70"],["Fischer Léa","","151,67"],["Gauthier, Lucie","","151,67"],
+      ["Glaess Rajaa","","151,67"],["Hend Ibtissem","","100"],["Hohnadel Déborah","","80"],
+      ["Junieres Laure","","104"],["Kamiza Tamatafika","","130"],["Khedir, Khadija","","50"],
+      ["Kokhtashvili Ekaterine","","104"],["Kurilko Tetiana","","104"],["Le Guen Laura","","130"],
+      ["Leonhart Kalina","","105"],["Mansoor Sodaba","","104"],["Marlier Sandra","","130"],
+      ["Maurice Alain","","151,67"],["Mayetela Evelyne","","50"],["Mugisha Yannick","","120"],
+      ["Naman Omar","","104"],["Neyra-Prado, Rosa","","151,67"],["Nivet, Sylvie","","110"],
+      ["Njezi Linda","","100"],["Nohovitsyna Irina","","120"],["Nsabimana Gérard","","151,67"],
+      ["Pain John","","151,67"],["Papikyan Anna","","85"],["Pfister Prescilla","","80"],
+      ["Rohrbacher Jennifer","","115"],["Rosca Eléna","","110"],["Saddouki Saliha","","30"],
+      ["Seewald Jean-Jacques","","151,67"],["Smoki Nadia","","100"],["Smolarczuk Izabela","","140"],
+      ["Tchouate Tankoua Prisca","","151,67"],["Ture Fatou","","130"],["Zarcos Jessica","","30"],
+    ],
+  },
+  administratif: {
+    nom: "Personnel administratif",
+    salaries: [
+      ["Soulliez Jennifer","","120"],
+      ["Mischel Marie","","151,67"],
+      ["Suplon Tatiana","","151,67"],
+      ["Goetz Léa","","151,67"],
+      ["Fux Magali","","151,67"],
+    ],
+  },
+};
+
+// ---- Cases grises reprises des fichiers Excel de paie (Août & Septembre 2026) ----
+// Case grise = le salarié ne prend pas les transports / n'a pas de véhicule
+// (donc pas de frais km) / pas d'avantage nature. Reprises à l'identique des
+// fichiers Excel, uniquement pour les salariés qui existent déjà dans la
+// feuille : aucun salarié n'est ajouté. Une fois posées, on peut les
+// enlever/remettre au double-clic comme les autres couleurs.
+const GRISES = {
+  "cronenbourg": {
+    "Août 2026": {
+      "Acker Tatiana": ["avNature"],
+      "Akhonzada Abduljabar": ["forfaitKm", "kmsPdt", "avNature"],
+      "Amiri Saiedeh": ["forfaitKm", "kmsPdt", "avNature"],
+      "Bakemba Prisca": ["forfaitKm", "kmsPdt", "avNature"],
+      "Blanchet Yoann": ["forfaitKm", "avNature"],
+      "Bonnet Solange": ["forfaitKm", "avNature"],
+      "Bouzagloui Nadia": ["forfaitKm", "avNature"],
+      "Broladze Mariami": ["forfaitKm", "kmsPdt", "avNature"],
+      "Cadoni Laura": ["titreTr", "avNature"],
+      "Deutsch Maëva": ["titreTr", "avNature"],
+      "Diaboungana, Sylvie": ["forfaitKm", "kmsPdt", "avNature"],
+      "Diadhiou Chantal": ["forfaitKm", "kmsPdt", "avNature"],
+      "Diallo Djeinabou": ["titreTr", "forfaitKm", "kmsPdt"],
+      "Dietrich, Aurore": ["forfaitKm", "kmsPdt", "avNature"],
+      "Dingeldein, Prescilla": ["avNature"],
+      "Dix Annie": ["forfaitKm", "kmsPdt", "avNature"],
+      "Donati Anastasia": ["forfaitKm", "avNature"],
+      "Duchene Monique": ["forfaitKm", "kmsPdt", "avNature"],
+      "El Aydi Asmae": ["forfaitKm", "kmsPdt", "avNature"],
+      "Fischer Léa": ["titreTr", "avNature"],
+      "Gauthier, Lucie": ["forfaitKm", "kmsPdt", "avNature"],
+      "Glaess Rajaa": ["titreTr", "forfaitKm", "avNature"],
+      "Hend Ibtissem": ["titreTr", "avNature"],
+      "Hohnadel Déborah": ["titreTr", "forfaitKm", "kmsPdt", "avNature"],
+      "Junieres Laure": ["forfaitKm", "kmsPdt", "avNature"],
+      "Kamiza Tamatafika": ["forfaitKm", "kmsPdt", "avNature"],
+      "Khedir, Khadija": ["forfaitKm", "kmsPdt", "avNature"],
+      "Kokhtashvili Ekaterine": ["forfaitKm", "kmsPdt", "avNature"],
+      "Kurilko Tetiana": ["forfaitKm", "kmsPdt", "avNature"],
+      "Le Guen Laura": ["titreTr", "forfaitKm", "kmsPdt"],
+      "Leonhart Kalina": ["titreTr", "avNature"],
+      "Mansoor Sodaba": ["forfaitKm", "kmsPdt", "avNature"],
+      "Marlier Sandra": ["forfaitKm", "kmsPdt", "avNature"],
+      "Maurice Alain": ["titreTr", "forfaitKm", "avNature"],
+      "Mayetela Evelyne": ["titreTr", "avNature"],
+      "Mugisha Yannick": ["forfaitKm", "kmsPdt", "avNature"],
+      "Naman Omar": ["forfaitKm", "kmsPdt", "avNature"],
+      "Neyra-Prado, Rosa": ["forfaitKm", "kmsPdt", "avNature"],
+      "Nivet, Sylvie": ["titreTr", "avNature"],
+      "Njezi Linda": ["titreTr", "forfaitKm", "avNature"],
+      "Nohovitsyna Irina": ["forfaitKm", "kmsPdt", "avNature"],
+      "Nsabimana Gérard": ["forfaitKm", "kmsPdt", "avNature"],
+      "Pain John": ["titreTr", "avNature"],
+      "Papikyan Anna": ["forfaitKm", "kmsPdt", "avNature"],
+      "Pfister Prescilla": ["forfaitKm", "kmsPdt", "avNature"],
+      "Rohrbacher Jennifer": ["titreTr", "forfaitKm", "kmsPdt", "avNature"],
+      "Rosca Eléna": ["forfaitKm", "kmsPdt", "avNature"],
+      "Saddouki Saliha": ["titreTr", "forfaitKm", "avNature"],
+      "Seewald Jean-Jacques": ["titreTr", "avNature"],
+      "Smoki Nadia": ["forfaitKm", "avNature"],
+      "Smolarczuk Izabela": ["forfaitKm", "kmsPdt", "avNature"],
+      "Tchouate Tankoua Prisca": ["titreTr", "forfaitKm", "avNature"],
+      "Ture Fatou": ["forfaitKm", "kmsPdt", "avNature"],
+      "Zarcos Jessica": ["titreTr", "kmsPdt", "avNature"],
+    },
+    "Septembre 2026": {
+      "Acker Tatiana": ["avNature"],
+      "Akhonzada Abduljabar": ["forfaitKm", "kmsPdt", "avNature"],
+      "Amiri Saiedeh": ["forfaitKm", "kmsPdt", "avNature"],
+      "Bakemba Prisca": ["forfaitKm", "kmsPdt", "avNature"],
+      "Blanchet Yoann": ["forfaitKm", "avNature"],
+      "Bonnet Solange": ["forfaitKm", "avNature"],
+      "Bouzagloui Nadia": ["forfaitKm", "avNature"],
+      "Broladze Mariami": ["forfaitKm", "kmsPdt", "avNature"],
+      "Cadoni Laura": ["titreTr", "avNature"],
+      "Deutsch Maëva": ["titreTr", "avNature"],
+      "Diaboungana, Sylvie": ["forfaitKm", "kmsPdt", "avNature"],
+      "Diadhiou Chantal": ["forfaitKm", "kmsPdt", "avNature"],
+      "Diallo Djeinabou": ["titreTr", "forfaitKm", "kmsPdt"],
+      "Dietrich, Aurore": ["forfaitKm", "kmsPdt", "avNature"],
+      "Dingeldein, Prescilla": ["avNature"],
+      "Dix Annie": ["forfaitKm", "kmsPdt", "avNature"],
+      "Donati Anastasia": ["forfaitKm", "avNature"],
+      "Duchene Monique": ["forfaitKm", "kmsPdt", "avNature"],
+      "El Aydi Asmae": ["forfaitKm", "kmsPdt", "avNature"],
+      "Fischer Léa": ["titreTr", "avNature"],
+      "Gauthier, Lucie": ["forfaitKm", "kmsPdt", "avNature"],
+      "Glaess Rajaa": ["titreTr", "forfaitKm", "avNature"],
+      "Hend Ibtissem": ["titreTr", "avNature"],
+      "Hohnadel Déborah": ["titreTr", "forfaitKm", "kmsPdt", "avNature"],
+      "Junieres Laure": ["forfaitKm", "kmsPdt", "avNature"],
+      "Kamiza Tamatafika": ["forfaitKm", "kmsPdt", "avNature"],
+      "Khedir, Khadija": ["forfaitKm", "kmsPdt", "avNature"],
+      "Kokhtashvili Ekaterine": ["forfaitKm", "kmsPdt", "avNature"],
+      "Kurilko Tetiana": ["forfaitKm", "kmsPdt", "avNature"],
+      "Le Guen Laura": ["titreTr", "forfaitKm", "kmsPdt"],
+      "Leonhart Kalina": ["titreTr", "avNature"],
+      "Mansoor Sodaba": ["forfaitKm", "kmsPdt", "avNature"],
+      "Marlier Sandra": ["forfaitKm", "kmsPdt", "avNature"],
+      "Maurice Alain": ["titreTr", "forfaitKm", "avNature"],
+      "Mayetela Evelyne": ["titreTr", "avNature"],
+      "Mugisha Yannick": ["forfaitKm", "kmsPdt", "avNature"],
+      "Naman Omar": ["forfaitKm", "kmsPdt", "avNature"],
+      "Neyra-Prado, Rosa": ["forfaitKm", "kmsPdt", "avNature"],
+      "Nivet, Sylvie": ["titreTr", "avNature"],
+      "Njezi Linda": ["titreTr", "forfaitKm", "avNature"],
+      "Nohovitsyna Irina": ["forfaitKm", "kmsPdt", "avNature"],
+      "Nsabimana Gérard": ["forfaitKm", "kmsPdt", "avNature"],
+      "Pain John": ["titreTr", "avNature"],
+      "Papikyan Anna": ["forfaitKm", "kmsPdt", "avNature"],
+      "Pfister Prescilla": ["forfaitKm", "kmsPdt", "avNature"],
+      "Rohrbacher Jennifer": ["titreTr", "forfaitKm", "kmsPdt", "avNature"],
+      "Rosca Eléna": ["forfaitKm", "kmsPdt", "avNature"],
+      "Saddouki Saliha": ["titreTr", "forfaitKm", "avNature"],
+      "Seewald Jean-Jacques": ["titreTr", "avNature"],
+      "Smoki Nadia": ["forfaitKm", "avNature"],
+      "Smolarczuk Izabela": ["forfaitKm", "kmsPdt", "avNature"],
+      "Tchouate Tankoua Prisca": ["titreTr", "forfaitKm", "avNature"],
+      "Ture Fatou": ["forfaitKm", "kmsPdt", "avNature"],
+      "Zarcos Jessica": ["titreTr", "kmsPdt", "avNature"],
+    },
+  },
+  "administratif": {
+    "Août 2026": {
+      "Soulliez Jennifer": ["forfaitKm", "kmsPdt"],
+      "Mischel Marie": ["titreTr", "forfaitKm", "kmsPdt"],
+      "Suplon Tatiana": ["titreTr", "forfaitKm", "kmsPdt", "avNature"],
+      "Goetz Léa": ["forfaitKm", "kmsPdt", "avNature"],
+    },
+    "Septembre 2026": {
+      "Soulliez Jennifer": ["forfaitKm", "kmsPdt"],
+      "Mischel Marie": ["titreTr", "forfaitKm", "kmsPdt"],
+      "Suplon Tatiana": ["titreTr", "forfaitKm", "kmsPdt", "avNature"],
+      "Goetz Léa": ["forfaitKm", "kmsPdt", "avNature"],
+    },
+  },
+  "vendenheim": {
+    "Août 2026": {
+      "ABOUDA Habiba": ["titreTr"],
+      "BELHEDI Anissa": ["titreTr"],
+      "BILOMBA Séraphine": ["forfaitKm"],
+      "BORAS Ouassila": ["titreTr"],
+      "CAVILLIER Lova": ["titreTr", "forfaitKm"],
+      "CHATILLON Aurélie": ["titreTr"],
+      "DEL MINCHONI Victor": ["titreTr"],
+      "ERDOGAN Gulizar": ["titreTr"],
+      "GRIESBACH Muriel": ["titreTr"],
+      "HOUSSEIN WABERI Kadra": ["titreTr"],
+      "IVANIASHVILI Nino": ["forfaitKm"],
+      "KALT Coralyne": ["forfaitKm"],
+      "KONDZIELA Cassandra": ["forfaitKm"],
+      "LEMAITRE Emmanuelle": ["titreTr"],
+      "MATT Claudia": ["forfaitKm"],
+      "NEUBURGER Laura": ["titreTr"],
+      "ONIMUS Claire": ["titreTr"],
+      "RAUSER Sony": ["forfaitKm"],
+      "RINK Aurélie": ["forfaitKm"],
+      "TEKIN Dilek": ["titreTr"],
+      "WEBER Angèle": ["titreTr"],
+      "WELSCH Andréia": ["titreTr"],
+    },
+    "Septembre 2026": {
+      "ABOUDA Habiba": ["titreTr"],
+      "BILOMBA Séraphine": ["forfaitKm"],
+      "BORAS Ouassila": ["titreTr"],
+      "CAVILLIER Lova": ["titreTr", "forfaitKm"],
+      "CHATILLON Aurélie": ["titreTr"],
+      "DEL MINCHONI Victor": ["titreTr"],
+      "ERDOGAN Gulizar": ["titreTr"],
+      "GRIESBACH Muriel": ["titreTr"],
+      "HOUSSEIN WABERI Kadra": ["titreTr"],
+      "KALT Coralyne": ["forfaitKm"],
+      "KONDZIELA Cassandra": ["forfaitKm"],
+      "MATT Claudia": ["forfaitKm"],
+      "NEUBURGER Laura": ["titreTr"],
+      "ONIMUS Claire": ["titreTr"],
+      "RAUSER Sony": ["forfaitKm"],
+      "RINK Aurélie": ["forfaitKm"],
+      "TEKIN Dilek": ["titreTr"],
+      "WEBER Angèle": ["titreTr"],
+      "WELSCH Andréia": ["titreTr"],
+    },
+  },
+};
+function normNom(s) {
+  return String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase().replace(/,/g, " ").replace(/\s+/g, " ").trim();
+}
+// Pose les cases grises sur les salariés présents. Chaque ligne n'est traitée
+// qu'une fois (marqueur _gris) : si on enlève une case grise à la main, elle
+// ne revient pas au rechargement. Ne touche jamais une case déjà colorée.
+function appliquerGrises(agence, mois, rows) {
+  const src = (GRISES[agence] || {})[mois];
+  if (!src) return false;
+  const parNom = {};
+  Object.keys(src).forEach(n => { parNom[normNom(n)] = src[n]; });
+  let modif = false;
+  rows.forEach(r => {
+    if (r._gris2) return;
+    const keys = parNom[normNom(r.nom)];
+    if (!keys) return;
+    if (!r._hl) r._hl = {};
+    const off = r._grisOff || {};
+    keys.forEach(k => { if (!off[k]) r._hl[k + "_gris"] = "hl-grey"; });
+    r._gris2 = true;
+    modif = true;
+  });
+  return modif;
+}
+
+// ---- Mois disponibles ----
+const MOIS = [
+  "Novembre 2026","Octobre 2026","Septembre 2026","Août 2026","Juillet 2026","Juin 2026","Mai 2026","Avril 2026",
+  "Mars 2026","Février 2026","Janvier 2026","Décembre 2025","Novembre 2025",
+  "Octobre 2025","Septembre 2025","Août 2025","Juillet 2025","Juin 2025"
+];
+
+const STORE_KEY = "aidaux_prepaie_v1"; // conservé pour compat, plus utilisé pour la sauvegarde
+
+// ---- State ----
+let store = {}; // cache mémoire des feuilles déjà chargées depuis le serveur
+let curAgence = "vendenheim";
+let curMois = MOIS[0];
+let curTab = "prepaie";
+
+// ---- Persistance partagée (base commune, plus de localStorage) ----
+let saveTimer = null;
+let pendingSave = null; // { agence, mois } en attente d'envoi (utilisé pour forcer l'envoi si la page se ferme trop vite)
+function setSyncStatus(state) {
+  const el = document.getElementById("syncStatus");
+  if (!el) return;
+  if (state === "saving") { el.textContent = "Enregistrement…"; el.style.opacity = "0.7"; }
+  else if (state === "ok") { el.textContent = "Enregistré"; el.style.opacity = "0.55"; }
+  else if (state === "error") { el.textContent = "⚠ Échec de l'enregistrement — réessaie"; el.style.opacity = "1"; }
+  else { el.textContent = ""; }
+}
+
+async function pushSheet(agence, mois) {
+  // sécurité : jamais d'envoi d'une feuille absente de la mémoire (ça l'effacerait)
+  if (!store[agence] || !Array.isArray(store[agence][mois])) return;
+  const rows = store[agence][mois];
+  setSyncStatus("saving");
+  try {
+    const resp = await fetch(
+      "/api/sheet?agence=" + encodeURIComponent(agence) + "&mois=" + encodeURIComponent(mois),
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rows: rows }),
+      }
+    );
+    if (!resp.ok) throw new Error("save failed");
+    setSyncStatus("ok");
+  } catch (e) {
+    setSyncStatus("error");
+  }
+  if (pendingSave && pendingSave.agence === agence && pendingSave.mois === mois) pendingSave = null;
+}
+
+// Envoi immédiat et fiable (utilisé quand l'onglet se ferme/se cache) : sendBeacon
+// part même si la page est en train de se décharger, contrairement à fetch().
+function flushPendingSaveNow() {
+  if (!pendingSave) return;
+  const { agence, mois } = pendingSave;
+  if (!store[agence] || !Array.isArray(store[agence][mois])) { pendingSave = null; return; }
+  const rows = store[agence][mois];
+  const url = "/api/sheet?agence=" + encodeURIComponent(agence) + "&mois=" + encodeURIComponent(mois);
+  try {
+    if (navigator.sendBeacon) {
+      const blob = new Blob([JSON.stringify({ rows: rows })], { type: "application/json" });
+      navigator.sendBeacon(url + "&via=beacon", blob);
+    } else {
+      fetch(url, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ rows: rows }), keepalive: true });
+    }
+  } catch (e) {}
+  pendingSave = null;
+  if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+}
+
+// Appelé à chaque modification d'une case ; regroupe les sauvegardes réseau
+// (une seule requête ~700ms après la dernière frappe) plutôt qu'une par lettre tapée.
+// Si la page se ferme/se cache avant ces 700ms, flushPendingSaveNow() prend le relais.
+function saveStore() {
+  if (saveTimer) clearTimeout(saveTimer);
+  const agence = curAgence, mois = curMois;
+  pendingSave = { agence, mois };
+  saveTimer = setTimeout(() => { pushSheet(agence, mois); }, 700);
+}
+
+// Filet de sécurité : dès que l'onglet passe en arrière-plan ou se ferme,
+// on envoie tout de suite ce qui était encore en attente.
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") flushPendingSaveNow();
+});
+window.addEventListener("pagehide", flushPendingSaveNow);
+window.addEventListener("beforeunload", flushPendingSaveNow);
+
+// ---- Reprise du mois précédent : « NON » Ticket resto + avenant CDI → contrat ----
+// Pour chaque salarié, si sa case Ticket resto était « NON » le mois d'avant
+// (même nom), on la remet en « NON ». Chaque ligne n'est traitée qu'une fois
+// (marqueur _nonRepris) : si on enlève le NON à la main, il ne revient pas.
+const nomCle = n => String(n || "").trim().toLowerCase().replace(/\s+/g, " ");
+async function reprendreNon(agence, mois, rows, depth) {
+  const idx = moisIndex(mois);
+  // les mois jusqu'à septembre 2026 sont déjà remplis : on n'y touche pas
+  if (idx < 0 || idx < moisIndex("Octobre 2026") || depth > 12) return false;
+  const prev = nomMois(idx - 1);
+  await ensureSheetLoaded(agence, prev, depth + 1);
+  const prevRows = (store[agence] || {})[prev] || [];
+  const nonPrec = {}, contratPrec = {}, embauchePrec = {}, grisPrec = {};
+  prevRows.forEach(r => {
+    const cle = nomCle(r.nom);
+    // cases grises (pas de voiture, pas de transport…) : reprises le mois suivant
+    const g = Object.keys(r._hl || {}).filter(k => /_gris$/.test(k) && r._hl[k] === "hl-grey");
+    if (g.length) grisPrec[cle] = g;
+    if (String(r.embauche || "").trim()) embauchePrec[cle] = String(r.embauche).trim();
+    const m = r._hl && r._hl.trNbre;
+    if (TICKET_MARKS.indexOf(m) >= 0) nonPrec[cle] = m;
+    // Avenant coché CDI = devient le contrat des mois suivants.
+    // Une fois repris, le contrat continue d'être reporté de mois en mois.
+    const av = String(r.avenant || "").trim();
+    if (av && r.typeContrat === "CDI") contratPrec[cle] = av;
+    else if (r._contratCdi && String(r.contrat || "").trim()) contratPrec[cle] = String(r.contrat).trim();
+  });
+  let change = false;
+  rows.forEach(r => {
+    if (!r._hl) r._hl = {};
+    const cle = nomCle(r.nom);
+    // cases grises du mois d'avant (sauf celles dégrisées à la main ce mois-ci)
+    (grisPrec[cle] || []).forEach(gk => {
+      const k = gk.replace(/_gris$/, "");
+      if (r._hl[gk] !== "hl-grey" && !(r._grisOff && r._grisOff[k])) {
+        r._hl[gk] = "hl-grey";
+        change = true;
+      }
+    });
+    // date d'embauche vide : reprise du mois d'avant (même nom)
+    if (!String(r.embauche || "").trim() && embauchePrec[cle]) {
+      r.embauche = embauchePrec[cle];
+      change = true;
+    }
+    if (!r._nonRepris) {
+      const m = nonPrec[cle];
+      if (m && !r._hl.trNbre) { r._hl.trNbre = m; r.trNbre = ""; }
+      r._nonRepris = true;
+      change = true;
+    }
+    // Contrat repris dès que l'avenant CDI du mois d'avant est posé ou change
+    // (et plus seulement la toute première fois que le mois est ouvert).
+    // _avSource = valeur déjà reprise : si on corrige le contrat à la main
+    // ensuite, on ne l'écrase pas tant que l'avenant d'avant ne change pas.
+    const c = contratPrec[cle];
+    if (c && r._avSource !== c) {
+      r.contrat = c; r._contratCdi = c; r._avSource = c;
+      change = true;
+    }
+  });
+  return change;
+}
+
+async function ensureSheetLoaded(agence, mois, depth) {
+  depth = depth || 0;
+  store[agence] = store[agence] || {};
+  if (store[agence][mois]) return; // déjà en mémoire, rien à recharger
+  try {
+    const resp = await fetch(
+      "/api/sheet?agence=" + encodeURIComponent(agence) + "&mois=" + encodeURIComponent(mois)
+    );
+    if (resp.ok) {
+      const data = await resp.json();
+      if (data.rows) {
+        data.rows.forEach(r => { if (!r._id) r._id = uid(); });
+        store[agence][mois] = data.rows;
+        // feuille existante : cases grises + reprise du mois d'avant, puis on enregistre
+        const g = appliquerGrises(agence, mois, data.rows);
+        const n = await reprendreNon(agence, mois, data.rows, depth);
+        if ((g || n) && depth === 0) pushSheet(agence, mois);
+        return;
+      }
+    }
+  } catch (e) {}
+  // Rien côté serveur : on amorce depuis le trousseau de l'agence, en
+  // mémoire seulement (on n'écrit rien tant que personne n'a rien tapé,
+  // pour ne jamais bloquer un futur import de vraies données).
+  // À partir d'octobre 2026, on part de la liste du mois d'avant (noms, dates
+  // d'embauche, contrats à jour) plutôt que de la liste de départ, qui n'a pas
+  // toutes les dates d'embauche.
+  let depart = AGENCES[agence].salaries;
+  const idx = moisIndex(mois);
+  if (idx >= moisIndex("Octobre 2026") && depth <= 12) {
+    const prev = nomMois(idx - 1);
+    await ensureSheetLoaded(agence, prev, depth + 1);
+    const prevRows = ((store[agence] || {})[prev] || []).filter(r => String(r.nom || "").trim());
+    if (prevRows.length) depart = prevRows.map(r => [r.nom, r.embauche, r.contrat]);
+  }
+  store[agence][mois] = depart.map(s => emptyRow(s));
+  appliquerGrises(agence, mois, store[agence][mois]);
+  // feuille pas encore créée : « NON » repris en mémoire seulement (ils
+  // seront enregistrés avec la première saisie)
+  await reprendreNon(agence, mois, store[agence][mois], depth);
+}
+
+// ---- Suppression d'un salarié : aussi dans les mois suivants ----
+// Quand on supprime un salarié sur un mois, on le retire (même nom) de tous
+// les mois suivants déjà créés. Les mois pas encore créés n'ont rien à faire :
+// ils reprennent la liste du mois d'avant, où il n'est déjà plus.
+async function supprimerDansMoisSuivants(agence, mois, nom) {
+  const cle = nomCle(nom);
+  const idx = moisIndex(mois);
+  if (!cle || idx < 0) return;
+  const suivants = MOIS.filter(m => moisIndex(m) > idx)
+    .sort((a, b) => moisIndex(a) - moisIndex(b));
+  let erreur = false;
+  for (const m of suivants) {
+    const url = "/api/sheet?agence=" + encodeURIComponent(agence) + "&mois=" + encodeURIComponent(m);
+    try {
+      const resp = await fetch(url);
+      if (resp.ok) {
+        const data = await resp.json();
+        if (Array.isArray(data.rows)) {
+          const reste = data.rows.filter(r => nomCle(r.nom) !== cle);
+          if (reste.length !== data.rows.length) {
+            const put = await fetch(url, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ rows: reste }),
+            });
+            if (!put.ok) erreur = true;
+          }
+        }
+      } else if (resp.status !== 404) {
+        erreur = true;
+      }
+    } catch (e) { erreur = true; }
+    // copie en mémoire : on l'oublie, elle sera rechargée à jour à l'ouverture du mois
+    if (store[agence]) delete store[agence][m];
+  }
+  if (erreur) alert("« " + nom + " » a été supprimé de " + mois +
+    ", mais pas de tous les mois suivants (problème de connexion). Réessaie ou vérifie les mois suivants.");
+}
+
+// Bascule l'agence/le mois affiché : charge la feuille depuis le serveur
+// (avec petit indicateur de chargement) puis affiche.
+async function switchSheet(agence, mois) {
+  // on enregistre tout de suite ce qui était en attente, puis on oublie les
+  // copies en mémoire des mois depuis octobre 2026 : ils sont rechargés à jour
+  // (avenant CDI coché, « NON », etc. repris du mois d'avant à chaque ouverture)
+  if (pendingSave) {
+    const ps = pendingSave;
+    if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+    await pushSheet(ps.agence, ps.mois); // attendu : le mois d'avant est bien à jour côté serveur
+  }
+  if (store[agence]) Object.keys(store[agence]).forEach(m => {
+    if (moisIndex(m) >= moisIndex("Octobre 2026")) delete store[agence][m];
+  });
+  curAgence = agence;
+  curMois = mois;
+  const tbody = document.getElementById("tbody");
+  if (tbody) tbody.innerHTML = '<tr><td style="padding:18px;color:#7a8a99;">Chargement…</td></tr>';
+  await ensureSheetLoaded(agence, mois);
+  render();
+}
+
+// toutes les clés utilisées, tous onglets confondus
+const ALL_KEYS = ["nom"].concat(
+  TABS.reduce((a, t) => a.concat(t.cols.map(c => c.key)), [])
+);
+function uid() {
+  return Math.random().toString(36).slice(2) + Date.now().toString(36);
+}
+
+function emptyRow(seed) {
+  const r = {};
+  ALL_KEYS.forEach(k => r[k] = "");
+  r._hl = {};
+  r._id = uid();
+  if (seed) { r.nom = seed[0]||""; r.embauche = seed[1]||""; r.contrat = seed[2]||""; }
+  return r;
+}
+
+function getSheet(agence, mois) {
+  store[agence] = store[agence] || {};
+  if (!store[agence][mois]) {
+    // filet de sécurité seulement (ne devrait pas arriver : switchSheet()
+    // charge toujours la feuille avant d'appeler render()).
+    store[agence][mois] = AGENCES[agence].salaries.map(s => emptyRow(s));
+  }
+  return store[agence][mois];
+}
+
+// ---- Éligibilité Ticket resto ----
+// Règle : embauche + 2 mois (fin de période d'essai), puis le mois suivant.
+// Ex. embauche le 20/05 -> éligible à partir du 01/08.
+const FR_MONTHS = {
+  "janvier":0,"février":1,"fevrier":1,"mars":2,"avril":3,"mai":4,"juin":5,
+  "juillet":6,"août":7,"aout":7,"septembre":8,"octobre":9,"novembre":10,
+  "décembre":11,"decembre":11
+};
+const FR_MONTH_NAMES = ["janvier","février","mars","avril","mai","juin",
+  "juillet","août","septembre","octobre","novembre","décembre"];
+
+function parseDateFr(s) { // "jj/mm/aaaa" -> {y,m,d} ou null
+  const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec((s || "").trim());
+  if (!m) return null;
+  return { d: +m[1], m: +m[2] - 1, y: +m[3] };
+}
+function parseMois(s) { // "Août 2026" -> {y,m} ou null
+  const p = (s || "").toLowerCase().trim().split(/\s+/);
+  if (p.length < 2 || !(p[0] in FR_MONTHS)) return null;
+  return { m: FR_MONTHS[p[0]], y: parseInt(p[1], 10) };
+}
+// Renvoie le 1er mois d'éligibilité en index absolu (année*12+mois), ou null
+function eligIndex(embauche) {
+  const d = parseDateFr(embauche);
+  if (!d) return null;
+  // mois de début + 2 (fin d'essai) + 1 (mois suivant) = +3
+  return d.y * 12 + d.m + 3;
+}
+function eligLabel(embauche) {
+  const idx = eligIndex(embauche);
+  if (idx == null) return "";
+  const y = Math.floor(idx / 12), m = idx % 12;
+  return "01/" + String(m + 1).padStart(2, "0") + "/" + y;
+}
+function eligShort(embauche) { // "08/26"
+  const idx = eligIndex(embauche);
+  if (idx == null) return "";
+  const y = Math.floor(idx / 12), m = idx % 12;
+  return String(m + 1).padStart(2, "0") + "/" + String(y).slice(-2);
+}
+// true si, pour le mois affiché, le salarié a droit aux tickets resto
+function ticketDebloque(embauche, mois) {
+  const e = eligIndex(embauche);
+  const mm = parseMois(mois);
+  if (e == null || !mm) return true; // pas de date -> on ne verrouille pas
+  return (mm.y * 12 + mm.m) >= e;
+}
+
+// ---- Rendering ----
+function renderHead(cols) {
+  const thead = document.getElementById("thead");
+  thead.innerHTML = "";
+  const tr = document.createElement("tr");
+  const thNum = document.createElement("th");
+  thNum.className = "rownum"; thNum.textContent = "#";
+  tr.appendChild(thNum);
+  cols.forEach(col => {
+    const th = document.createElement("th");
+    if (col.type === "name") th.className = "hname";
+    if (col.type === "ticket") th.className = "group";
+    th.innerHTML = (col.thLabel || col.label) + (col.sub ? '<br><span class="th-sub">' + col.sub + '</span>' : "");
+    tr.appendChild(th);
+  });
+  const thDel = document.createElement("th");
+  thDel.className = "del";
+  tr.appendChild(thDel);
+  thead.appendChild(tr);
+}
+
+function render() {
+  const cols = tabColumns();
+  renderHead(cols);
+
+  // la légende Ticket resto n'a de sens que dans l'onglet Pré-paie
+  document.getElementById("legend").style.display =
+    (curTab === "prepaie") ? "" : "none";
+
+  const tbody = document.getElementById("tbody");
+
+  // Garde une trace du champ actif (et de la position du curseur) pour ne
+  // pas perturber une saisie en cours, même si le tri déplace la ligne.
+  const active = document.activeElement;
+  const activeCellKey = (active && active.dataset) ? active.dataset.cellKey : null;
+  const activeSelStart = (active && active.selectionStart != null) ? active.selectionStart : null;
+
+  tbody.innerHTML = "";
+  const rows = getSheet(curAgence, curMois);
+  if (curTab === "prepaie") {
+    rows.sort((a, b) => (a.nom || "").localeCompare(b.nom || "", "fr", { sensitivity: "base" }));
+  }
+
+  let cleaned = false;
+  rows.forEach((row, ri) => {
+    if (!row._hl) row._hl = {};
+    const tr = document.createElement("tr");
+
+    const num = document.createElement("td");
+    num.className = "rownum";
+    num.textContent = ri + 1;
+    tr.appendChild(num);
+
+    cols.forEach(col => {
+      const td = document.createElement("td");
+      td.dataset.label = String(col.label || col.thLabel || "").replace(/<[^>]+>/g, " ").trim();
+      if (col.type === "name") td.className = "name";
+      if (col.wide) td.classList.add("wide");
+      // La case Ticket resto n'accepte que le marquage « ne bénéficie pas » ;
+      // on nettoie tout autre marquage (anciennes couleurs) resté coincé.
+      if (col.type === "ticket" && row._hl[col.key]
+          && TICKET_MARKS.indexOf(row._hl[col.key]) < 0) {
+        row._hl[col.key] = "";
+        saveStore();
+      }
+      // Hors Ticket resto : le gris est rangé à part (clé _gris) pour cohabiter
+      // avec le bleu ; un ancien gris posé sur la clé principale y est déplacé.
+      if (col.type !== "ticket" && row._hl[col.key] === "hl-grey") {
+        row._hl[col.key + "_gris"] = "hl-grey";
+        row._hl[col.key] = "";
+        cleaned = true;
+      }
+      // Hors Ticket resto : sinon seul le bleu posé par un clic compte ; toute
+      // ancienne couleur (vert...) est effacée.
+      if (col.type !== "ticket" && row._hl[col.key] && row._hl[col.key] !== "hl-blue") {
+        row._hl[col.key] = "";
+        cleaned = true;
+      }
+      let hl = row._hl[col.key];
+      if (hl) td.classList.add(hl);
+      const grisKey = col.key + "_gris";
+      if (col.type !== "ticket" && row._hl[grisKey] === "hl-grey") td.classList.add("hl-grey");
+      // Clic droit = griser / dégriser la case (ex. pas de voiture → KMS grisés).
+      // Le gris est repris automatiquement les mois suivants.
+      if (col.type !== "ticket" && col.type !== "name" && col.key !== "nom") {
+        td.addEventListener("contextmenu", (e) => {
+          e.preventDefault();
+          row._grisOff = row._grisOff || {};
+          if (row._hl[grisKey] === "hl-grey") {
+            row._hl[grisKey] = "";
+            row._grisOff[col.key] = true;
+          } else {
+            row._hl[grisKey] = "hl-grey";
+            delete row._grisOff[col.key];
+          }
+          saveStore();
+          render();
+        });
+      }
+      // Bleu surligneur : pour Ticket resto il est rangé à part (clé _bleu)
+      // pour ne pas se mélanger avec le « NON ».
+      const bleuKey = (col.type === "ticket") ? col.key + "_bleu" : col.key;
+      if (col.type === "ticket" && row._hl[bleuKey] === "hl-blue") td.classList.add("hl-blue");
+
+      // Ticket resto : cycle au double-clic (inchangé)
+      const cycle = ["", "hl-orange", "hl-navy"];
+
+      // CDI / CDD : deux cases à cocher, une seule active à la fois
+      if (col.type === "cdicdd") {
+        const box = document.createElement("div");
+        box.className = "cdicdd";
+        td.classList.add("cdicdd-td");
+        ["CDI", "CDD"].forEach(v => {
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.textContent = v;
+          if (row[col.key] === v) btn.classList.add("on");
+          btn.addEventListener("click", () => {
+            row[col.key] = row[col.key] === v ? "" : v;
+            saveStore();
+            render();
+          });
+          box.appendChild(btn);
+        });
+        td.appendChild(box);
+        tr.appendChild(td);
+        return;
+      }
+
+      const inp = document.createElement("input");
+      inp.type = "text";
+      inp.value = row[col.key] || "";
+      inp.dataset.cellKey = row._id + ":" + col.key;
+      inp.addEventListener("input", () => {
+        row[col.key] = inp.value;
+        saveStore();
+        if (col.type === "name") scheduleSort();
+      });
+      if (col.type === "name") {
+        inp.addEventListener("blur", () => sortRowsNow());
+        inp.addEventListener("keydown", (e) => { if (e.key === "Enter") inp.blur(); });
+      }
+      if (col.minWidth) inp.style.minWidth = col.minWidth + "px";
+      if (col.left) inp.style.textAlign = "left";
+      // Double-clic sur une case = surligneur bleu (re-double-clic = enlève le bleu).
+      // Un simple clic sert juste à se placer dans la case pour écrire.
+      // Exception Ticket resto : simple clic = bleu, double-clic = « NON » (inchangé).
+      let bleuTimer = null;
+      const basculerBleu = () => {
+        const on = row._hl[bleuKey] !== "hl-blue";
+        row._hl[bleuKey] = on ? "hl-blue" : "";
+        if (bleuKey === col.key) hl = row._hl[bleuKey];
+        td.classList.toggle("hl-blue", on);
+        saveStore();
+        if (!td.isConnected) render(); // le tableau a été redessiné entre-temps
+      };
+      if (col.type === "ticket") {
+        td.addEventListener("mousedown", (e) => {
+          if (document.activeElement === inp) return;
+          // on attend un instant : si c'est un double-clic (« NON »), on ne touche pas au bleu
+          if (e.detail > 1) { clearTimeout(bleuTimer); bleuTimer = null; return; }
+          bleuTimer = setTimeout(() => { bleuTimer = null; basculerBleu(); }, 280);
+        });
+      } else {
+        td.addEventListener("dblclick", () => {
+          basculerBleu();
+          const sel = window.getSelection && window.getSelection();
+          if (sel) sel.removeAllRanges(); // évite que le double-clic sélectionne le texte
+        });
+      }
+      // Ticket resto : double-clic = « NON » (inchangé)
+      if (col.type === "ticket") td.addEventListener("dblclick", (e) => {
+        clearTimeout(bleuTimer); bleuTimer = null;
+        const cur = hl || "";
+        const idx = cycle.indexOf(cur);
+        const next = cycle[((idx < 0 ? 0 : idx) + 1) % cycle.length];
+        HL.forEach(h => h && td.classList.remove(h));
+        if (next) td.classList.add(next);
+        row._hl[col.key] = next;
+        hl = next;
+        saveStore();
+        if (col.type === "ticket") render(); // réapplique le statut de la case
+      });
+
+      // Ticket resto : couleur manuelle prioritaire, sinon déblocage auto
+      if (col.type === "ticket") {
+        if (hl) {
+          // Une couleur posée à la main = statut manuel (ex : ne bénéficie pas)
+          inp.disabled = true;
+          inp.value = "";
+          if (TICKET_MARKS.indexOf(hl) >= 0) {
+            inp.placeholder = "NON";
+            td.title = "Ne bénéficie pas des titres restaurant";
+          }
+        } else if (ticketDebloque(row.embauche, curMois)) {
+          td.classList.add("tr-ok");
+        } else {
+          td.classList.add("tr-lock");
+          inp.disabled = true;
+          inp.value = "";
+          inp.style.display = "none";
+          const idx2 = eligIndex(row.embauche);
+          const badge = document.createElement("span");
+          badge.className = "tr-badge";
+          if (idx2 != null) {
+            const y = Math.floor(idx2 / 12), m = idx2 % 12;
+            const nom = FR_MONTH_NAMES[m];
+            badge.textContent = "dès " + nom.charAt(0).toUpperCase() + nom.slice(1)
+              + " " + String(y).slice(-2);
+          } else {
+            badge.textContent = "—";
+          }
+          td.title = "Titres restaurant à partir du " + eligLabel(row.embauche)
+            + " (fin de période d'essai)";
+          td.appendChild(badge);
+        }
+      }
+
+      td.appendChild(inp);
+      tr.appendChild(td);
+    });
+
+    const del = document.createElement("td");
+    del.className = "del";
+    const btn = document.createElement("button");
+    btn.textContent = "✕";
+    btn.title = "Supprimer ce salarié";
+    btn.addEventListener("click", async () => {
+      const nom = String(row.nom || "").trim();
+      const msg = nom
+        ? "Supprimer « " + nom + " » de " + curMois + " et de tous les mois suivants ?"
+        : "Supprimer cette ligne ?";
+      if (!confirm(msg)) return;
+      const agence = curAgence, mois = curMois;
+      const i = rows.indexOf(row);
+      if (i >= 0) rows.splice(i, 1);
+      saveStore();
+      render();
+      if (nom) await supprimerDansMoisSuivants(agence, mois, nom);
+    });
+    del.appendChild(btn);
+    tr.appendChild(del);
+
+    tbody.appendChild(tr);
+  });
+
+  if (cleaned) saveStore(); // enregistre l'effacement des anciennes couleurs
+
+  document.getElementById("statCount").textContent = rows.length;
+
+  if (activeCellKey) {
+    const el = document.querySelector('[data-cell-key="' + activeCellKey.replace(/"/g, '\\"') + '"]');
+    if (el && el !== document.activeElement) {
+      el.focus();
+      if (activeSelStart != null && el.setSelectionRange) { try { el.setSelectionRange(activeSelStart, activeSelStart); } catch (e) {} }
+    }
+  }
+}
+
+function sortRowsNow() {
+  render(); // render() trie déjà systématiquement et restaure le focus
+}
+
+let sortTimer = null;
+function scheduleSort() {
+  if (sortTimer) clearTimeout(sortTimer);
+  sortTimer = setTimeout(sortRowsNow, 900);
+}
+
+function addRow() {
+  const rows = getSheet(curAgence, curMois);
+  const newRow = emptyRow(null);
+  rows.push(newRow);
+  saveStore();
+  render();
+  // focus le nom de la nouvelle ligne (elle peut apparaître n'importe où
+  // dans le tri alphabétique, une ligne sans nom passe en premier)
+  const inp = document.querySelector('[data-cell-key="' + newRow._id + ':nom"]');
+  if (inp) inp.focus();
+}
+
+function exportCsv() {
+  const rows = getSheet(curAgence, curMois);
+  const cols = tabColumns();
+  const sep = ";";
+  const esc = v => '"' + String(v == null ? "" : v).replace(/"/g, '""') + '"';
+  const lines = [cols.map(c => esc(c.label)).join(sep)];
+  rows.forEach(r => {
+    lines.push(cols.map(c => esc(r[c.key])).join(sep));
+  });
+  const csv = "﻿" + lines.join("\r\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "prepaie_" + curTab + "_" + AGENCES[curAgence].nom
+    + "_" + curMois.replace(/\s+/g, "_") + ".csv";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ---- Commande tickets resto : nom + nombre de tickets, uniquement ----
+// Ne garde que les salariés qui ont un nombre saisi dans la case Ticket resto
+// (les cases « NON » ou bloquées sont vides, donc ignorées).
+// Ouvre une page mise en forme, à imprimer ou enregistrer en PDF.
+function exportTickets() {
+  const rows = getSheet(curAgence, curMois);
+  const lignes = [];
+  let total = 0;
+  rows.forEach(r => {
+    const nom = String(r.nom || "").trim();
+    const nb = String(r.trNbre || "").trim();
+    if (!nom || !nb) return;
+    const n = parseFloat(nb.replace(",", "."));
+    if (!isNaN(n)) { if (n <= 0) return; total += n; }
+    lignes.push([nom, nb]);
+  });
+  if (!lignes.length) {
+    alert("Aucun ticket resto saisi pour " + AGENCES[curAgence].nom + " – " + curMois + ".");
+    return;
+  }
+  const h = v => String(v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const agence = AGENCES[curAgence].nom;
+  const date = new Date().toLocaleDateString("fr-FR");
+  const trs = lignes.map((l, i) =>
+    "<tr" + (i % 2 ? ' class="alt"' : "") + "><td>" + h(l[0]) + "</td><td class=\"n\">" + h(l[1]) + "</td></tr>"
+  ).join("");
+  const html = `<!doctype html><html lang="fr"><head><meta charset="utf-8">
+<title>Commande tickets resto – ${h(agence)} – ${h(curMois)}</title>
+<style>
+  body { font-family: "Segoe UI", Arial, sans-serif; color: #1f2a44; margin: 40px auto; max-width: 620px; padding: 0 16px; }
+  .top { display: flex; align-items: center; gap: 16px; border-bottom: 3px solid #0e8a8a; padding-bottom: 14px; }
+  .top img { height: 54px; }
+  h1 { font-size: 22px; margin: 0; }
+  .meta { color: #5b6478; font-size: 14px; margin-top: 4px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 24px; font-size: 15px; }
+  th { background: #1f2a44; color: #fff; text-align: left; padding: 10px 14px; }
+  td { padding: 9px 14px; border-bottom: 1px solid #e3e6ee; }
+  tr.alt td { background: #f4f7fa; }
+  .n { text-align: center; width: 160px; }
+  tr.total td { font-weight: 700; background: #e3f3f3; border-top: 2px solid #0e8a8a; border-bottom: none; }
+  .foot { margin-top: 18px; color: #8a92a6; font-size: 12px; }
+  .actions { margin-top: 28px; text-align: center; }
+  button { background: #0e8a8a; color: #fff; border: 0; border-radius: 6px; padding: 10px 20px; font-size: 15px; cursor: pointer; }
+  button[disabled] { opacity: .6; cursor: wait; }
+  @media print { .actions { display: none; } body { margin: 0 auto; } }
+</style></head><body>
+<div class="top"><img src="${location.origin}/logo.png" alt="" onerror="this.remove()">
+<div><h1>Commande tickets restaurant</h1><div class="meta">Agence ${h(agence)} · ${h(curMois)}</div></div></div>
+<table><thead><tr><th>Salarié</th><th class="n">Nombre de tickets</th></tr></thead>
+<tbody>${trs}<tr class="total"><td>TOTAL (${lignes.length} salarié${lignes.length > 1 ? "s" : ""})</td><td class="n">${h(String(total).replace(".", ","))}</td></tr></tbody></table>
+<div class="foot">Document généré le ${date}</div>
+<div class="actions"><button id="pdf" disabled>Préparation du PDF…</button></div>
+<script>
+const D = ${JSON.stringify({ agence, mois: curMois, date, total: String(total).replace(".", ","), lignes }).replace(/</g, "\\u003c")};
+const bouton = document.getElementById("pdf");
+function telecharger() {
+  const doc = new jspdf.jsPDF({ unit: "mm", format: "a4" });
+  const logo = document.querySelector(".top img");
+  let x = 20;
+  if (logo && logo.complete && logo.naturalWidth) {
+    try { const h = 18, w = h * logo.naturalWidth / logo.naturalHeight; doc.addImage(logo, "PNG", 20, 14, w, h); x = 24 + w; } catch (e) {}
+  }
+  doc.setFont("helvetica", "bold"); doc.setFontSize(17); doc.setTextColor(31, 42, 68);
+  doc.text("Commande tickets restaurant", x, 22);
+  doc.setFont("helvetica", "normal"); doc.setFontSize(10.5); doc.setTextColor(91, 100, 120);
+  doc.text("Agence " + D.agence + " · " + D.mois, x, 29);
+  doc.setDrawColor(14, 138, 138); doc.setLineWidth(0.8); doc.line(20, 36, 190, 36);
+  doc.autoTable({
+    startY: 42, margin: { left: 20, right: 20 },
+    head: [["Salarié", { content: "Nombre de tickets", styles: { halign: "center" } }]],
+    body: D.lignes,
+    foot: [["TOTAL (" + D.lignes.length + " salarié" + (D.lignes.length > 1 ? "s" : "") + ")",
+            { content: D.total, styles: { halign: "center" } }]],
+    styles: { fontSize: 10.5, cellPadding: 3, textColor: [31, 42, 68] },
+    headStyles: { fillColor: [31, 42, 68], textColor: 255 },
+    footStyles: { fillColor: [227, 243, 243], textColor: [31, 42, 68], fontStyle: "bold" },
+    alternateRowStyles: { fillColor: [244, 247, 250] },
+    columnStyles: { 1: { halign: "center", cellWidth: 45 } },
+  });
+  doc.setFontSize(8.5); doc.setTextColor(138, 146, 166);
+  doc.text("Document généré le " + D.date, 20, doc.lastAutoTable.finalY + 8);
+  doc.save("Commande tickets resto - " + D.agence + " - " + D.mois + ".pdf");
+}
+// bibliothèque PDF chargée sans bloquer la page ; si elle n'arrive pas en 6 s
+// (réseau filtré...), on se rabat sur l'impression du navigateur
+function charger(src, suite) {
+  const s = document.createElement("script");
+  s.src = src; s.onload = suite; s.onerror = suite;
+  document.head.appendChild(s);
+}
+charger("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js", () =>
+  charger("https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js", () => {}));
+(function pret(n) {
+  if (window.jspdf && window.jspdf.jsPDF && window.jspdf.jsPDF.API.autoTable) {
+    bouton.disabled = false; bouton.textContent = "⬇ Télécharger le PDF"; bouton.onclick = telecharger;
+  } else if (n > 60) {
+    bouton.disabled = false; bouton.textContent = "Imprimer / Enregistrer en PDF"; bouton.onclick = () => window.print();
+  } else setTimeout(() => pret(n + 1), 100);
+})(0);
+<\/script>
+</body></html>`;
+  const w = window.open("", "_blank");
+  if (!w) { alert("Autorisez les fenêtres pop-up pour ce site afin d'afficher la commande."); return; }
+  w.document.open();
+  w.document.write(html);
+  w.document.close();
+}
+
+// ---- Tickets resto calculés depuis le planning Ximi ----
+// Par jour : prestations (hors annulées) + intervacations (trou entre deux
+// prestations ≤ limite) ; 6 h ou plus = 1 ticket. Le calcul se fait côté
+// serveur (/api/ximi/tickets) ; ici on affiche la proposition et on ne remplit
+// la case qu'après validation. Les salariés « NON » ou pas encore éligibles
+// ne sont jamais modifiés.
+const LIMITE_KEY = "aidaux_prepaie_limite_intervacation";
+function limiteIntervacation() {
+  try { const v = parseInt(localStorage.getItem(LIMITE_KEY), 10); if (v >= 0) return v; } catch (e) {}
+  return 120;
+}
+function hMin(m) { return Math.floor(m / 60) + "h" + String(m % 60).padStart(2, "0"); }
+
+function fenetreTickets(contenu) {
+  let fond = document.getElementById("ticketsXimi");
+  if (!fond) {
+    fond = document.createElement("div");
+    fond.id = "ticketsXimi";
+    fond.style.cssText = "position:fixed;inset:0;background:rgba(20,30,50,.45);z-index:1000;display:flex;align-items:flex-start;justify-content:center;padding:24px 12px;overflow:auto;";
+    fond.addEventListener("click", e => { if (e.target === fond) fond.remove(); });
+    document.body.appendChild(fond);
+  }
+  fond.innerHTML = '<div style="background:#fff;border-radius:10px;max-width:760px;width:100%;padding:20px 22px;box-shadow:0 10px 40px rgba(0,0,0,.25);font-size:14px;">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px;">'
+    + '<h2 style="margin:0;font-size:18px;display:flex;align-items:center;gap:10px;">'
+    + '<span style="width:32px;height:32px;border-radius:9px;background:#e6f7f6;color:#0a8f88;display:inline-flex;align-items:center;justify-content:center;flex:none;">'
+    + '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+    + '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 12h.01M12 12h.01M16 12h.01M8 16h.01M12 16h.01M16 16h.01"/></svg></span>'
+    + 'Tickets resto depuis Ximi — ' + AGENCES[curAgence].nom + ' · ' + curMois + '</h2>'
+    + '<button class="tx-fermer" title="Fermer" onclick="document.getElementById(\'ticketsXimi\').remove()">✕</button></div>'
+    + contenu + '</div>';
+  return fond;
+}
+
+async function rafraichirXimi(majTexte, force, mois) {
+  // l'API Ximi se lit par morceaux : on rappelle le serveur jusqu'à la fin du tour
+  // Un appel bloqué ou refusé (Ximi lent, coupure Vercel) est réessayé ; on
+  // abandonne après 5 échecs d'affilée.
+  const t0 = Date.now();
+  let echecs = 0, derniere = "";
+  for (let i = 0; i < 2000; i++) {
+    const ctl = new AbortController();
+    const minuteur = setTimeout(() => ctl.abort(), 25000);
+    let d = {}, ok = false;
+    try {
+      const r = await fetch("/api/ximi/rafraichir?mois=" + encodeURIComponent(mois) + (force && i === 0 ? "&force=1" : ""),
+                            { method: "POST", signal: ctl.signal });
+      d = await r.json().catch(() => ({}));
+      ok = r.ok && d.ok;
+      if (!ok) derniere = d.erreur || ("Erreur " + r.status);
+    } catch (e) {
+      derniere = "pas de réponse du serveur";
+    }
+    clearTimeout(minuteur);
+    const sec = Math.round((Date.now() - t0) / 1000);
+    if (ok) {
+      echecs = 0;
+      majTexte(d.etape === "test du tri" ? "Préparation de la lecture Ximi… (" + sec + " s)"
+               : "Lecture du planning Ximi… " + d.lues + " interventions parcourues (" + sec + " s)");
+      if (d.termine) return;
+    } else {
+      echecs++;
+      if (echecs >= 8) throw new Error(derniere);
+      majTexte("Lecture du planning Ximi… Ximi est lent, nouvel essai (" + echecs + "/8, " + sec + " s)");
+    }
+  }
+}
+
+async function calculerTicketsXimi(force) {
+  const sheetAgence = curAgence, sheetMois = curMois;
+  const fond = fenetreTickets('<p id="ticketsEtat">Lecture du planning Ximi…</p>');
+  const majTexte = t => { const el = document.getElementById("ticketsEtat"); if (el) el.textContent = t; };
+  let data;
+  try {
+    await rafraichirXimi(majTexte, force === true, sheetMois);
+    majTexte("Calcul…");
+    const r = await fetch("/api/ximi/tickets?mois=" + encodeURIComponent(sheetMois) + "&limite=" + limiteIntervacation());
+    data = await r.json();
+    if (!r.ok || !data.ok) throw new Error(data.erreur || ("Erreur " + r.status));
+  } catch (e) {
+    fenetreTickets('<p style="color:#b42318;">⚠ Impossible de lire Ximi : ' + String(e.message || e).replace(/</g, "&lt;") + '</p>');
+    return;
+  }
+  if (sheetAgence !== curAgence || sheetMois !== curMois) return; // on a changé de feuille entre-temps
+
+  const rows = getSheet(curAgence, curMois);
+  const lignes = rows.filter(r => String(r.nom || "").trim()).map(r => {
+    const cle = cleNomXimi(r.nom);
+    const a = data.agents[cle];
+    const non = TICKET_MARKS.indexOf((r._hl || {}).trNbre) >= 0;
+    const bloque = !ticketDebloque(r.embauche, curMois);
+    return { r, a, non, bloque, propose: a ? a.tickets : null };
+  });
+  const h = v => String(v == null ? "" : v).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+  const trs = lignes.map((l, i) => {
+    let etat, coche = false;
+    if (l.non) etat = '<span style="color:#8a92a6;">« NON » — inchangé</span>';
+    else if (l.bloque) etat = '<span style="color:#8a92a6;">pas encore éligible — inchangé</span>';
+    else if (!l.a) etat = '<span style="color:#b45309;">introuvable dans Ximi (ou aucune prestation)</span>';
+    else { etat = ""; coche = String(l.propose) !== String(l.r.trNbre || "").trim(); }
+    // une pastille par jour : jour de la semaine, date, total ; turquoise si ticket
+    const JOURS = ["dim", "lun", "mar", "mer", "jeu", "ven", "sam"];
+    const detail = l.a ? '<div style="display:flex;flex-wrap:wrap;gap:6px;">' + l.a.jours.map(j => {
+      const js = JOURS[new Date(j.date + "T12:00:00").getDay()];
+      return '<div style="min-width:62px;text-align:center;border-radius:8px;padding:4px 6px;line-height:1.25;'
+        + (j.ticket ? 'background:#e0f7f6;border:1px solid #00BBB4;color:#0a5f5b;' : 'background:#f6f8fa;border:1px solid #e4ebef;color:#7a8a99;') + '">'
+        + '<div style="font-size:10px;text-transform:uppercase;letter-spacing:.04em;">' + js + ' ' + j.date.slice(8, 10) + '/' + j.date.slice(5, 7) + '</div>'
+        + '<div style="font-size:13px;font-weight:700;">' + hMin(j.minutes) + (j.ticket ? ' 🍽' : '') + '</div></div>';
+    }).join("") + '</div>' : "";
+    const modifiable = !l.non && !l.bloque && l.a;
+    return '<tr style="border-bottom:1px solid #e3e6ee;vertical-align:top;">'
+      + '<td style="padding:6px 4px;">' + (modifiable ? '<input type="checkbox" data-i="' + i + '"' + (coche ? " checked" : "") + '>' : "") + '</td>'
+      + '<td style="padding:6px 4px;"><b>' + h(l.r.nom) + '</b>'
+      + (detail ? '<br><button type="button" class="voirJours" data-i="' + i + '" style="margin-top:4px;border:0;background:none;color:#0a8f88;font-size:12px;font-weight:600;cursor:pointer;padding:0;">📅 Voir les jours</button>' : "")
+      + '</td>'
+      + '<td style="padding:6px 4px;text-align:center;">' + h(l.r.trNbre || "—") + '</td>'
+      + '<td style="padding:6px 4px;text-align:center;font-weight:700;">' + (l.a && !l.non && !l.bloque ? l.propose : "") + '</td>'
+      + '<td style="padding:6px 4px;">' + etat + '</td></tr>'
+      + (detail ? '<tr id="jours-' + i + '" style="display:none;"><td></td><td colspan="4" style="padding:4px 4px 10px;font-size:12px;text-align:left;">'
+        + '<div style="color:#7a8a99;margin:2px 0 6px;">Heures du jour — en turquoise 🍽 = 6 h ou plus = 1 ticket</div>' + detail + '</td></tr>' : "");
+  }).join("");
+
+  fenetreTickets(
+    '<p style="margin:0 0 8px;color:#5b6478;">Par jour : prestations (hors annulées) + intervacations. 6 h ou plus = 1 ticket. '
+    + 'Les <b>formations</b> ne sont pas lisibles dans Ximi par l\'API : à ajouter à la main.'
+    + (data.dernier_tour ? ' Planning lu le ' + h(data.dernier_tour) + '.' : '')
+    + ' <a href="#" id="relireXimi">Relire Ximi maintenant</a></p>'
+    + '<p style="margin:0 0 10px;">Un trou entre deux prestations compte comme intervacation jusqu\'à '
+    + '<input id="limiteInterv" type="number" min="0" max="600" step="5" value="' + limiteIntervacation() + '"> min '
+    + '<button class="tx-mini" id="recalcTickets">Recalculer</button></p>'
+    + '<div style="overflow:auto;"><table style="width:100%;border-collapse:collapse;">'
+    + '<thead><tr style="text-align:left;border-bottom:2px solid #1f2a44;"><th></th><th>Salarié</th><th style="text-align:center;">Actuel</th><th style="text-align:center;">Proposé</th><th></th></tr></thead>'
+    + '<tbody>' + trs + '</tbody></table></div>'
+    + '<div style="margin-top:14px;display:flex;gap:10px;justify-content:flex-end;">'
+    + '<button class="tx-btn clair" onclick="document.getElementById(\'ticketsXimi\').remove()">Annuler</button>'
+    + '<button class="tx-btn" id="appliquerTickets">✓ Appliquer les lignes cochées</button></div>'
+  );
+  document.getElementById("recalcTickets").addEventListener("click", () => {
+    const v = parseInt(document.getElementById("limiteInterv").value, 10);
+    if (v >= 0) { try { localStorage.setItem(LIMITE_KEY, String(v)); } catch (e) {} }
+    calculerTicketsXimi();
+  });
+  document.querySelectorAll("#ticketsXimi .voirJours").forEach(b => b.addEventListener("click", () => {
+    const tr = document.getElementById("jours-" + b.dataset.i);
+    const ouvert = tr.style.display !== "none";
+    tr.style.display = ouvert ? "none" : "";
+    b.textContent = ouvert ? "📅 Voir les jours" : "📅 Masquer les jours";
+  }));
+  document.getElementById("relireXimi").addEventListener("click", e => { e.preventDefault(); calculerTicketsXimi(true); });
+  document.getElementById("appliquerTickets").addEventListener("click", () => {
+    let n = 0;
+    document.querySelectorAll("#ticketsXimi input[type=checkbox][data-i]").forEach(cb => {
+      if (!cb.checked) return;
+      const l = lignes[+cb.dataset.i];
+      l.r.trNbre = String(l.propose);
+      n++;
+    });
+    document.getElementById("ticketsXimi").remove();
+    if (n) { saveStore(); render(); }
+  });
+}
+
+// même clé que _cle_nom() côté serveur : sans accents, minuscules, mots triés
+function cleNomXimi(nom) {
+  const t = String(nom || "").normalize("NFKD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  return (t.match(/[a-z]+/g) || []).sort().join(" ");
+}
+
+function renderTabs() {
+  const bar = document.getElementById("tabs");
+  bar.innerHTML = "";
+  TABS.forEach(t => {
+    const b = document.createElement("div");
+    b.className = "tab" + (t.id === curTab ? " active" : "");
+    b.textContent = t.label;
+    b.addEventListener("click", () => { curTab = t.id; renderTabs(); render(); });
+    bar.appendChild(b);
+  });
+}
+
+// ---- Surlignage de la ligne active (clic/saisie dans une case) ----
+function initRowHighlight() {
+  const grid = document.getElementById("grid");
+  grid.addEventListener("focusin", (e) => {
+    if (e.target.tagName !== "INPUT") return;
+    const tr = e.target.closest("tr");
+    if (!tr) return;
+    grid.querySelectorAll("tbody tr.row-selected").forEach(r => {
+      if (r !== tr) r.classList.remove("row-selected");
+    });
+    tr.classList.add("row-selected");
+  });
+}
+
+// ---- Init controls ----
+function initControls() {
+  const selA = document.getElementById("agence");
+  Object.keys(AGENCES).forEach(k => {
+    const o = document.createElement("option");
+    o.value = k; o.textContent = AGENCES[k].nom;
+    selA.appendChild(o);
+  });
+  selA.value = curAgence;
+  selA.addEventListener("change", () => { switchSheet(selA.value, curMois); });
+
+  const selM = document.getElementById("mois");
+  remplirMois();
+  selM.addEventListener("change", () => { switchSheet(curAgence, selM.value); });
+
+  document.getElementById("addMois").addEventListener("click", ajouterMoisSuivant);
+  document.getElementById("addRow2").addEventListener("click", addRow);
+  document.getElementById("exportCsv").addEventListener("click", exportCsv);
+  document.getElementById("exportTickets").addEventListener("click", exportTickets);
+  document.getElementById("calcTickets").addEventListener("click", calculerTicketsXimi);
+  document.getElementById("printBtn").addEventListener("click", () => window.print());
+}
+
+// ---- Récupération des anciennes données (localStorage, avant la migration) ----
+function getOldLocalStore() {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return (parsed && typeof parsed === "object" && Object.keys(parsed).length) ? parsed : null;
+  } catch (e) { return null; }
+}
+
+async function importOldLocalStore() {
+  const old = getOldLocalStore();
+  if (!old) return;
+  const btn = document.getElementById("importOldData");
+  if (btn) { btn.disabled = true; btn.textContent = "Import en cours…"; }
+
+  let imported = 0, skipped = 0;
+  for (const agence of Object.keys(old)) {
+    for (const mois of Object.keys(old[agence] || {})) {
+      const rows = old[agence][mois];
+      if (!rows || !rows.length) continue;
+      try {
+        const check = await fetch(
+          "/api/sheet?agence=" + encodeURIComponent(agence) + "&mois=" + encodeURIComponent(mois)
+        );
+        if (check.ok) {
+          // Une version existe déjà côté serveur (créée par quelqu'un d'autre
+          // ou par toi juste après la mise à jour) : on ne l'écrase pas.
+          skipped++;
+          continue;
+        }
+        await fetch(
+          "/api/sheet?agence=" + encodeURIComponent(agence) + "&mois=" + encodeURIComponent(mois),
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ rows: rows }),
+          }
+        );
+        imported++;
+      } catch (e) { skipped++; }
+    }
+  }
+
+  localStorage.setItem(STORE_KEY + "_importe_le", new Date().toISOString());
+  localStorage.removeItem(STORE_KEY);
+  document.getElementById("importBanner").style.display = "none";
+  store = {}; // vide le cache mémoire pour forcer un rechargement depuis le serveur
+  await switchSheet(curAgence, curMois);
+
+  let msg = imported + " feuille(s) importée(s).";
+  if (skipped) msg += " " + skipped + " déjà présente(s) côté serveur (non écrasée(s) — vérifie-les si besoin).";
+  alert(msg);
+}
+
+function initImportBanner() {
+  const old = getOldLocalStore();
+  const banner = document.getElementById("importBanner");
+  if (!old || !banner) return;
+  banner.style.display = "flex";
+  document.getElementById("importOldData").addEventListener("click", importOldLocalStore);
+  document.getElementById("dismissImport").addEventListener("click", () => {
+    banner.style.display = "none";
+  });
+}
+
+// ---- Ajout des mois au fur et à mesure (stockés côté serveur) ----
+function moisIndex(m) { const p = parseMois(m); return p ? p.y * 12 + p.m : -1; }
+function nomMois(idx) {
+  const n = FR_MONTH_NAMES[idx % 12];
+  return n.charAt(0).toUpperCase() + n.slice(1) + " " + Math.floor(idx / 12);
+}
+function trierMois() { MOIS.sort((a, b) => moisIndex(b) - moisIndex(a)); }
+function remplirMois() {
+  const selM = document.getElementById("mois");
+  selM.innerHTML = "";
+  MOIS.forEach(m => {
+    const o = document.createElement("option");
+    o.value = m; o.textContent = m;
+    selM.appendChild(o);
+  });
+  selM.value = curMois;
+}
+async function chargerMoisServeur() {
+  try {
+    const res = await fetch("/api/mois", { credentials: "same-origin" });
+    if (!res.ok) return;
+    const data = await res.json();
+    (data.mois || []).forEach(m => { if (!MOIS.includes(m)) MOIS.push(m); });
+    trierMois();
+    remplirMois();
+  } catch (e) { /* pas bloquant */ }
+}
+async function ajouterMoisSuivant() {
+  trierMois();
+  const nouveau = nomMois(moisIndex(MOIS[0]) + 1);
+  if (!confirm("Ajouter le mois « " + nouveau + " » ?")) return;
+  try {
+    const res = await fetch("/api/mois", {
+      method: "POST", credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mois: nouveau })
+    });
+    if (!res.ok) throw new Error();
+  } catch (e) { alert("Impossible d'ajouter le mois, réessaie."); return; }
+  if (!MOIS.includes(nouveau)) MOIS.push(nouveau);
+  trierMois();
+  curMois = nouveau;
+  remplirMois();
+  switchSheet(curAgence, nouveau);
+}
+
+// À l'ouverture : on va directement sur le mois en cours (s'il existe dans la liste)
+function moisEnCours() {
+  const d = new Date();
+  return nomMois(d.getFullYear() * 12 + d.getMonth());
+}
+(async () => {
+  initControls();
+  initRowHighlight();
+  initImportBanner();
+  renderTabs();
+  await chargerMoisServeur();
+  const courant = moisEnCours();
+  if (MOIS.includes(courant)) curMois = courant;
+  remplirMois();
+  switchSheet(curAgence, curMois);
+})();
+</script>
+</body>
+</html>
+
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AID'AUX — Pré-paie</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#1B2A6B">
+<link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Aid'Aux Pré-paie">
+<script>if('serviceWorker' in navigator){addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));}</script>
+<link rel="icon" type="image/x-icon" href="{{ url_for('favicon') }}">
+<style>
+  :root {
+    /* Palette AID'AUX : turquoise, bleu marine, orange + neutres */
+    --teal: #00BBB4;
+    --teal-dark: #0a8f88;
+    --navy: #000F9F;
+    --navy-deep: #0a1560;
+    --indigo: #000F9F;
+    --orange: #FF4713;
+    --bg: #eef2f5;
+    --card: #ffffff;
+    --text: #1f2a37;
+    --muted: #6b7a86;
+    --border: #e4ebef;
+    --border-strong: #d3dde3;
+    --shadow: 0 10px 30px rgba(0,15,159,0.08);
+    --shadow-sm: 0 2px 8px rgba(0,15,159,0.06);
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    font-family: "Inter", "Segoe UI", system-ui, Arial, sans-serif;
+    background:
+      radial-gradient(1100px 500px at 100% -10%, rgba(0,187,180,0.10), transparent 60%),
+      radial-gradient(900px 500px at -10% 0%, rgba(106,27,154,0.08), transparent 55%),
+      var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---- Header ---- */
+  .topbar {
+    background: linear-gradient(100deg, #0a1560 0%, #1a2aa0 55%, #00BBB4 140%);
+    color: #fff;
+    padding: 16px 28px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    box-shadow: var(--shadow-sm);
+  }
+  .brand { display: flex; align-items: center; gap: 14px; }
+  .brand .logo-badge {
+    width: 46px; height: 46px;
+    background: #fff; border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.18);
+  }
+  .brand .logo-badge img { height: 34px; display: block; }
+  .brand .titles h1 { font-size: 1.18rem; margin: 0; font-weight: 700; letter-spacing: .2px; }
+  .brand .titles p { margin: 2px 0 0; font-size: .8rem; color: rgba(255,255,255,.8); }
+  .topbar a.back {
+    margin-left: auto;
+    color: #fff;
+    text-decoration: none;
+    font-size: .88rem;
+    font-weight: 600;
+    border: 1px solid rgba(255,255,255,.35);
+    padding: 8px 16px;
+    border-radius: 999px;
+    transition: background .15s ease;
+    backdrop-filter: blur(4px);
+  }
+  .topbar a.back:hover { background: rgba(255,255,255,.15); }
+
+  .container { max-width: 1500px; margin: 0 auto; padding: 22px 24px 60px; }
+
+  /* ---- Toolbar card ---- */
+  .toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 10px;
+    align-items: center;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 16px 18px;
+    box-shadow: var(--shadow-sm);
+  }
+  .toolbar > .btn { padding: 10px 14px; white-space: nowrap; }
+  .toolbar > .spacer + .btn { margin-left: 0; }
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field label {
+    font-size: .68rem;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--muted);
+    font-weight: 700;
+  }
+  .select-wrap { position: relative; }
+  select {
+    appearance: none;
+    padding: 10px 38px 10px 14px;
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
+    font-size: .95rem;
+    font-weight: 600;
+    color: var(--indigo);
+    background: #fff;
+    min-width: 180px;
+    cursor: pointer;
+    transition: border-color .15s ease, box-shadow .15s ease;
+  }
+  select:hover { border-color: var(--teal); }
+  select:focus { outline: none; border-color: var(--teal); box-shadow: 0 0 0 3px rgba(0,187,180,.2); }
+  .select-wrap::after {
+    content: "▾";
+    position: absolute; right: 14px; top: 50%;
+    transform: translateY(-50%);
+    color: var(--muted); font-size: .8rem; pointer-events: none;
+  }
+  .spacer { flex: 1; }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 10px 18px;
+    border: none;
+    border-radius: 10px;
+    font-size: .9rem;
+    font-weight: 600;
+    cursor: pointer;
+    color: #fff;
+    background: var(--orange);
+    box-shadow: 0 4px 12px rgba(255,71,19,.28);
+    transition: transform .12s ease, box-shadow .12s ease, background .15s ease;
+  }
+  .btn:hover { background: #e8390c; transform: translateY(-1px); }
+  .btn:active { transform: translateY(0); }
+  .btn.secondary {
+    background: #e6f7f6; color: var(--teal-dark); box-shadow: none;
+    border: 1px solid #bfe9e6;
+  }
+  .btn.secondary:hover { background: var(--teal-dark); color: #fff; border-color: var(--teal-dark); }
+  .btn .ic {
+    width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  }
+  .btn.ghost {
+    background: #fff; color: var(--indigo);
+    border: 1px solid var(--border-strong); box-shadow: none;
+  }
+  .btn.ghost:hover { background: #f3f7f9; border-color: var(--teal); }
+
+  /* ---- Fenêtre « Tickets resto depuis Ximi » ---- */
+  .tx-fermer {
+    width: 34px; height: 34px; border-radius: 50%; border: 0; cursor: pointer;
+    background: #f1f5f8; color: #5b6478; font-size: 16px; line-height: 1;
+    display: inline-flex; align-items: center; justify-content: center; flex: none;
+    transition: background .15s ease, color .15s ease;
+  }
+  .tx-fermer:hover { background: #e0f7f6; color: var(--teal-dark); }
+  .tx-btn {
+    border: 0; border-radius: 999px; padding: 9px 20px; cursor: pointer;
+    font-size: .88rem; font-weight: 600; color: #fff; background: var(--teal-dark);
+    box-shadow: 0 3px 10px rgba(10,143,136,.25); transition: background .15s ease, transform .12s ease;
+  }
+  .tx-btn:hover { background: #087a74; transform: translateY(-1px); }
+  .tx-btn.clair {
+    background: transparent; color: #5b6478; box-shadow: none;
+  }
+  .tx-btn.clair:hover { background: #f1f5f8; color: #1f2a44; transform: none; }
+  .tx-mini {
+    border: 1px solid var(--teal); background: #fff; color: var(--teal-dark);
+    border-radius: 999px; padding: 3px 12px; font-size: .8rem; font-weight: 600; cursor: pointer;
+  }
+  .tx-mini:hover { background: #e0f7f6; }
+  #ticketsXimi input[type=checkbox] { accent-color: var(--teal-dark); width: 16px; height: 16px; cursor: pointer; }
+  #ticketsXimi input[type=number] {
+    width: 64px; padding: 3px 6px; border: 1px solid var(--border); border-radius: 6px; text-align: center;
+  }
+  #ticketsXimi a { color: var(--teal-dark); font-weight: 600; }
+
+  /* ---- Stat chips ---- */
+  .stats { display: flex; flex-wrap: wrap; gap: 12px; margin: 18px 0 6px; }
+  .chip {
+    display: flex; align-items: center; gap: 12px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 12px 16px;
+    box-shadow: var(--shadow-sm);
+    min-width: 150px;
+  }
+  .chip .ic {
+    width: 38px; height: 38px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.1rem; color: #fff; flex: none;
+  }
+  .chip .ic.a { background: linear-gradient(135deg,#00BBB4,#0a9a94); }
+  .chip .ic.b { background: linear-gradient(135deg,#FF4713,#e8390c); }
+  .chip .ic.c { background: linear-gradient(135deg,#000F9F,#0a1560); }
+  .chip .k { font-size: .68rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 700; }
+  .chip .v { font-size: 1.02rem; font-weight: 700; color: var(--indigo); line-height: 1.1; }
+
+  /* ---- Tabs ---- */
+  .tabs { display: flex; gap: 6px; margin: 20px 0 0; flex-wrap: wrap; }
+  .tab {
+    padding: 10px 18px;
+    border: 1px solid var(--border-strong);
+    border-bottom: none;
+    border-radius: 12px 12px 0 0;
+    background: #eef2f5;
+    color: var(--muted);
+    font-size: .9rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background .12s ease, color .12s ease;
+  }
+  .tab:hover { background: #e4eaef; color: var(--navy); }
+  .tab.active {
+    background: var(--card);
+    color: var(--navy);
+    box-shadow: 0 -2px 6px rgba(0,15,159,.06);
+    position: relative;
+  }
+  .tab.active::after {
+    content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px;
+    background: var(--teal); border-radius: 3px 3px 0 0;
+  }
+
+  /* ---- Legend ---- */
+  .legend {
+    display: flex; gap: 18px; flex-wrap: wrap;
+    font-size: .78rem; color: var(--muted);
+    align-items: center; margin: 12px 2px 14px;
+  }
+  .legend span { display: inline-flex; align-items: center; gap: 7px; }
+  .swatch { width: 15px; height: 15px; border-radius: 4px; border: 1px solid #0002; display: inline-block; }
+  .legend .hint { margin-left: auto; font-style: italic; }
+
+  /* ---- Table ---- */
+  .table-wrap {
+    overflow: auto;
+    /* le tableau défile dans son cadre : la ligne des titres reste visible */
+    max-height: calc(100vh - 150px);
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    box-shadow: var(--shadow);
+  }
+  table { border-collapse: separate; border-spacing: 0; width: 100%; font-size: .84rem; }
+  thead th {
+    background: #f4f8fa;
+    color: var(--indigo);
+    font-weight: 700;
+    padding: 11px 8px;
+    border-bottom: 1px solid var(--border-strong);
+    border-right: 1px solid var(--border);
+    text-align: center;
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    white-space: nowrap;
+  }
+  thead tr.sub th {
+    background: #eaf1f4;
+    font-size: .74rem;
+    font-weight: 600;
+    color: #3b4a72;
+    top: 44px;
+  }
+  thead th.group { background: #e7eefc; color: #26348c; }
+
+  tbody td {
+    border-bottom: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+    padding: 0;
+    text-align: center;
+    vertical-align: middle;
+  }
+  tbody tr:hover td { background: #f6fbfc; }
+  tbody tr:hover td.name { background: #eef8f7; }
+
+  /* ligne surlignée quand on saisit dans une de ses cases */
+  tbody tr.row-selected td {
+    box-shadow: inset 0 0 0 9999px rgba(255, 214, 0, 0.28);
+  }
+
+  /* sticky first columns */
+  /* « # » et « Salarié » restent visibles quand on défile vers la droite */
+  td.rownum, th.rownum { position: sticky; left: 0; z-index: 2; min-width: 44px; max-width: 44px; }
+  td.name, thead th.hname { position: sticky; left: 44px; z-index: 2; }
+  thead th.rownum, thead th.hname { z-index: 5; }
+
+  tbody td.name {
+    text-align: left;
+    font-weight: 600;
+    white-space: nowrap;
+    padding: 0 8px;
+    background: #fbfdfd;
+    box-shadow: 1px 0 0 var(--border);
+  }
+  tbody tr:nth-child(even) td.name { background: #f5f9f9; }
+
+  tbody input {
+    width: 100%;
+    border: none;
+    background: transparent;
+    padding: 9px 6px;
+    font: inherit;
+    text-align: center;
+    min-width: 74px;
+    color: var(--text);
+  }
+  tbody td.name input { text-align: left; font-weight: 600; min-width: 210px; color: var(--indigo); }
+  thead th.hname { min-width: 222px; text-align: left; padding-left: 12px; box-shadow: 1px 0 0 var(--border-strong); }
+  tbody td.wide input { text-align: left; min-width: 320px; }
+  tbody input:focus {
+    outline: none;
+    box-shadow: inset 0 0 0 2px var(--teal);
+    background: #fff;
+    border-radius: 6px;
+  }
+  /* surlignage aux couleurs AID'AUX */
+  td.hl-teal   input { background: var(--teal);   color:#fff; font-weight: 700; border-radius: 6px; }
+  td.hl-orange input { background: var(--orange); color:#fff; font-weight: 700; border-radius: 6px; }
+  td.hl-navy   input { background: var(--navy);   color:#fff; font-weight: 700; border-radius: 6px; }
+  /* surligneur bleu : double-clic pour poser/enlever (Ticket resto : simple clic) */
+  td.hl-blue { background: #8fd3ff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  td.hl-blue input { background: #8fd3ff !important; color: var(--text); font-weight: 600; border-radius: 6px; }
+  tbody tr.row-selected td.hl-blue { box-shadow: none; }
+  /* une case désactivée (NON, ticket bloqué) laisse passer les clics vers la case */
+  td input:disabled { pointer-events: none; }
+  td.hl-blue.hl-navy input { background: var(--navy) !important; color:#fff; font-weight:700; box-shadow: inset 0 0 0 4px #8fd3ff; }
+  td.hl-blue.hl-orange input { background: var(--orange) !important; color:#fff; font-weight:700; box-shadow: inset 0 0 0 4px #8fd3ff; }
+  /* Case grise = ne prend pas les transports / pas de véhicule / pas d'avantage */
+  td.hl-grey { background: #9a9a9a; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  td.hl-grey input { background: #9a9a9a; color:#fff; font-weight: 600; border-radius: 6px; }
+  /* un champ désactivé ne doit pas bloquer le double-clic sur la cellule */
+  tbody input:disabled { pointer-events: none; }
+  td.hl-teal input::placeholder,
+  td.hl-orange input::placeholder,
+  td.hl-navy input::placeholder { color:#fff; opacity:.95; font-weight:700; }
+
+  /* Ticket resto : déblocage auto */
+  .th-sub { display:block; font-size:.62rem; font-weight:600; color:var(--teal-dark); margin-top:2px; }
+  td.tr-lock { background: #f6f8fa; }
+  .tr-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: #eef1fb;
+    border: 1px solid #d5daf3;
+    color: var(--navy);
+    font-size: .74rem;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  td.tr-ok { background: #e6f7f6; }
+  td.tr-ok input { color: var(--teal-dark); font-weight:600; }
+
+  td.rownum {
+    background: #f0f5f7;
+    color: var(--muted);
+    font-size: .72rem;
+    font-weight: 600;
+    width: 44px;
+    text-align: center;
+    box-shadow: 1px 0 0 var(--border);
+  }
+  th.rownum { width: 44px; }
+
+  td.del { width: 42px; }
+  td.del button {
+    border: none;
+    background: transparent;
+    color: #c2c9d0;
+    cursor: pointer;
+    font-size: 1rem;
+    line-height: 1;
+    padding: 6px 8px;
+    border-radius: 8px;
+    transition: color .12s ease, background .12s ease;
+  }
+  td.del button:hover { color: var(--orange); background: #ffe9e2; }
+
+  .row-actions { margin-top: 16px; }
+
+  @media print {
+    .topbar a.back, .toolbar, .row-actions, td.del, .legend .hint, .stats { display: none !important; }
+    body { background: #fff; }
+    .container { padding: 0; max-width: none; }
+    .table-wrap { box-shadow: none; border: none; max-height: none; overflow: visible; }
+    .topbar { background: #101a6b !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+tbody td.cdicdd-td{padding:0 8px;width:1%;white-space:nowrap;text-align:center}
+.cdicdd{display:inline-flex;gap:4px}
+.cdicdd button{font:inherit;font-size:11px;font-weight:700;padding:3px 8px;border-radius:999px;border:1px solid #cfd9e2;background:#fff;color:#8a99a8;cursor:pointer;transition:all .15s}
+.cdicdd button:hover{border-color:var(--teal);color:var(--teal-dark)}
+.cdicdd button.on{background:var(--teal);border-color:var(--teal);color:#fff}
+  /* ---- Téléphone ---- */
+  @media (max-width: 700px) {
+    html, body { overflow-x: hidden; max-width: 100vw; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+    *, *::before, *::after { box-sizing: border-box; }
+    .container, .container > *, .topbar { max-width: 100vw; min-width: 0; }
+    .table-wrap { max-width: calc(100vw - 20px); -webkit-overflow-scrolling: touch; }
+    .toolbar .btn { white-space: normal; min-width: 0; line-height: 1.25; }
+    .legend { flex-wrap: wrap; }
+    .legend span, .legend .hint { min-width: 0; white-space: normal; margin-left: 0; }
+    .tabs { flex-wrap: wrap; }
+    /* haut de page compact : le tableau doit se voir sans défiler */
+    .topbar { padding: 8px 12px; gap: 4px 10px; }
+    .topbar .brand { width: auto; flex: 1; }
+    .topbar .logo-badge { width: 34px; height: 34px; }
+    .topbar h1 { font-size: 1.05rem; }
+    .topbar > span { display: none; }
+    .topbar .back { padding: 5px 10px; font-size: .78rem; }
+    .container { padding: 8px 8px 30px; }
+    .toolbar { padding: 8px; gap: 6px; border-radius: 12px; }
+    .toolbar .field { flex: 1 1 calc(50% - 6px); width: auto; }
+    .toolbar .field label { display: none; }
+    .toolbar select { padding: 7px 26px 7px 10px; font-size: .85rem; }
+    .toolbar .btn { flex: 1 1 calc(33% - 6px) !important; font-size: .72rem !important; padding: 7px 4px !important; }
+    tbody td.name input { min-width: 130px !important; }
+    thead th.hname { min-width: 140px !important; }
+    table { font-size: .78rem; }
+    .stats { display: none; }
+    .legend { display: none; }
+    .tabs { margin-top: 8px; gap: 4px; }
+    .tabs > * { padding: 6px 10px !important; font-size: .8rem; }
+    /* Tableau -> une fiche par salarié */
+    .table-wrap { max-height: none; overflow: visible; background: none; border: 0; box-shadow: none; margin-top: 8px; }
+    #grid, #grid tbody { display: block; width: 100%; }
+    #grid thead { display: none; }
+    #grid tbody tr { display: block; background: #fff; border: 1px solid var(--border); border-radius: 14px;
+                     margin: 0 0 10px; padding: 4px 12px 8px; box-shadow: var(--shadow-sm); position: relative; }
+    #grid tbody td { display: flex; align-items: center; gap: 10px; position: static !important;
+                     border: 0 !important; border-bottom: 1px solid #eef2f5 !important; padding: 5px 0 !important;
+                     min-width: 0 !important; max-width: none !important; width: auto !important; box-shadow: none !important; }
+    #grid tbody td:last-child { border-bottom: 0 !important; }
+    #grid tbody td::before { content: attr(data-label); flex: 0 0 42%; font-size: .74rem; font-weight: 700;
+                             color: var(--muted); text-transform: uppercase; letter-spacing: .03em; text-align: left; }
+    #grid tbody td { text-align: left !important; justify-content: flex-start; }
+    #grid tbody td input { flex: 1; min-width: 0 !important; width: 100%; text-align: left !important;
+                           border: 1px solid var(--border); border-radius: 8px; padding: 7px 9px; font-size: .95rem; }
+    #grid tbody td.rownum { display: none; }
+    #grid tbody td.name { padding: 8px 34px 8px 0 !important; }
+    #grid tbody td.name::before { display: none; }
+    #grid tbody td.name input { font-size: 1.05rem; font-weight: 700; border: 0; padding: 2px 0; }
+    #grid tbody td.del { position: absolute !important; top: 8px; right: 8px; border: 0 !important; padding: 0 !important; }
+    #grid tbody td.del::before { display: none; }
+    #grid tbody td.tr-lock .tr-badge { margin-left: 0; }
+    .topbar { flex-wrap: wrap; padding: 12px 14px; gap: 8px 12px; }
+    .topbar .brand { width: 100%; }
+    .topbar .titles p { display: none; }
+    .topbar > span { margin-left: 0 !important; width: 100%; overflow-wrap: anywhere; }
+    .topbar .back { margin: 0 !important; }
+    .container { padding: 12px 10px 40px; }
+    .toolbar { padding: 12px; gap: 10px; }
+    .toolbar .field, .toolbar select { width: 100%; min-width: 0; }
+    .toolbar .spacer { display: none; }
+    .toolbar .btn { flex: 1 1 calc(50% - 10px); justify-content: center; font-size: .85rem; padding: 10px 8px; }
+    .table-wrap { max-height: calc(100vh - 120px); }
+    tbody td.name input { min-width: 150px; }
+    thead th.hname { min-width: 160px; }
+  }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand">
+      <div class="logo-badge"><img src="{{ url_for('logo') }}" alt="AID'AUX"></div>
+      <div class="titles">
+        <h1>Aid'Aux Pré-paie</h1>
+        <p>Éléments variables de paie — par agence & par mois</p>
+      </div>
+    </div>
+    <span style="margin-left:auto; font-size:.82rem; color:rgba(255,255,255,.85);">{{ user_email }}</span>
+    <a class="back" href="/logout" style="margin-left:14px; margin-right:0;">Se déconnecter</a>
+    <a class="back" href="https://aidaux-portail.vercel.app" style="margin-left:0;">← Portail</a>
+  </div>
+
+  <div class="container">
+    <div class="toolbar">
+      <div class="field">
+        <label for="agence">Agence</label>
+        <div class="select-wrap"><select id="agence"></select></div>
+      </div>
+      <div class="field">
+        <label for="mois">Mois</label>
+        <div class="select-wrap"><select id="mois"></select></div>
+      </div>
+      <button class="btn ghost" id="addMois" title="Ajouter le mois suivant"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Mois suivant</button>
+      <div class="spacer"></div>
+      <button class="btn ghost" id="addRow2"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Ajouter un salarié</button>
+      <button class="btn secondary" id="exportCsv"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>Export CSV</button>
+      <button class="btn secondary" id="calcTickets" title="Calcule les tickets resto depuis le planning Ximi"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 12h.01M12 12h.01M16 12h.01M8 16h.01M12 16h.01M16 16h.01"/></svg>Calculer tickets</button>
+      <button class="btn secondary" id="exportTickets" title="Fichier à envoyer pour la commande des tickets resto"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8a2 2 0 0 0 2-2h12a2 2 0 0 0 2 2v8a2 2 0 0 0-2 2H6a2 2 0 0 0-2-2z"/><path d="M10 6v12" stroke-dasharray="2 2"/></svg>Commande tickets</button>
+      <button class="btn ghost" id="printBtn"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 9V4h10v5M7 17H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2"/><rect x="7" y="14" width="10" height="7" rx="1"/></svg>Imprimer</button>
+    </div>
+
+    <div class="stats">
+      <div class="chip"><div class="ic a">👥</div><div><div class="k">Salariés</div><div class="v" id="statCount">—</div></div></div>
+      <span id="syncStatus" style="align-self:center; margin-left:14px; font-size:.82rem; color:#7a8a99;"></span>
+    </div>
+
+    <div id="importBanner" style="display:none; margin:0 0 14px; padding:12px 16px; background:#fff7e0; border:1px solid #f0d98a; border-radius:10px; font-size:.9rem; align-items:center; gap:12px; flex-wrap:wrap;">
+      <span style="flex:1; min-width:220px;">📦 D'anciennes données ont été trouvées dans <b>ce navigateur</b> (avant la mise à jour). Veux-tu les envoyer vers la base partagée ?</span>
+      <button class="btn" id="importOldData" style="padding:7px 14px;">Importer</button>
+      <button class="btn ghost" id="dismissImport" style="padding:7px 14px;">Ignorer</button>
+    </div>
+
+    <div class="tabs" id="tabs"></div>
+
+    <div class="legend" id="legend">
+      <span><i class="swatch" style="background:#f0f3f6"></i> « dès MM/AA » = ouverture après la période d'essai</span>
       <span><i class="swatch" style="background:#8fd3ff"></i> clic sur une case = surligner en bleu (re-clic pour enlever)</span>
       <span class="hint">Ticket resto : déblocage auto après 2 mois d'essai. Double-cliquez la case pour la marquer « NON » (ne bénéficie pas).</span>
     </div>
