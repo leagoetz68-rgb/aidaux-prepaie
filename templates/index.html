@@ -1021,6 +1021,45 @@ async function ensureSheetLoaded(agence, mois, depth) {
   await reprendreNon(agence, mois, store[agence][mois], depth);
 }
 
+// ---- Suppression d'un salarié : aussi dans les mois suivants ----
+// Quand on supprime un salarié sur un mois, on le retire (même nom) de tous
+// les mois suivants déjà créés. Les mois pas encore créés n'ont rien à faire :
+// ils reprennent la liste du mois d'avant, où il n'est déjà plus.
+async function supprimerDansMoisSuivants(agence, mois, nom) {
+  const cle = nomCle(nom);
+  const idx = moisIndex(mois);
+  if (!cle || idx < 0) return;
+  const suivants = MOIS.filter(m => moisIndex(m) > idx)
+    .sort((a, b) => moisIndex(a) - moisIndex(b));
+  let erreur = false;
+  for (const m of suivants) {
+    const url = "/api/sheet?agence=" + encodeURIComponent(agence) + "&mois=" + encodeURIComponent(m);
+    try {
+      const resp = await fetch(url);
+      if (resp.ok) {
+        const data = await resp.json();
+        if (Array.isArray(data.rows)) {
+          const reste = data.rows.filter(r => nomCle(r.nom) !== cle);
+          if (reste.length !== data.rows.length) {
+            const put = await fetch(url, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ rows: reste }),
+            });
+            if (!put.ok) erreur = true;
+          }
+        }
+      } else if (resp.status !== 404) {
+        erreur = true;
+      }
+    } catch (e) { erreur = true; }
+    // copie en mémoire : on l'oublie, elle sera rechargée à jour à l'ouverture du mois
+    if (store[agence]) delete store[agence][m];
+  }
+  if (erreur) alert("« " + nom + " » a été supprimé de " + mois +
+    ", mais pas de tous les mois suivants (problème de connexion). Réessaie ou vérifie les mois suivants.");
+}
+
 // Bascule l'agence/le mois affiché : charge la feuille depuis le serveur
 // (avec petit indicateur de chargement) puis affiche.
 async function switchSheet(agence, mois) {
@@ -1308,12 +1347,18 @@ function render() {
     const btn = document.createElement("button");
     btn.textContent = "✕";
     btn.title = "Supprimer ce salarié";
-    btn.addEventListener("click", () => {
-      if (confirm("Supprimer « " + (row.nom || "cette ligne") + " » ?")) {
-        rows.splice(ri, 1);
-        saveStore();
-        render();
-      }
+    btn.addEventListener("click", async () => {
+      const nom = String(row.nom || "").trim();
+      const msg = nom
+        ? "Supprimer « " + nom + " » de " + curMois + " et de tous les mois suivants ?"
+        : "Supprimer cette ligne ?";
+      if (!confirm(msg)) return;
+      const agence = curAgence, mois = curMois;
+      const i = rows.indexOf(row);
+      if (i >= 0) rows.splice(i, 1);
+      saveStore();
+      render();
+      if (nom) await supprimerDansMoisSuivants(agence, mois, nom);
     });
     del.appendChild(btn);
     tr.appendChild(del);
