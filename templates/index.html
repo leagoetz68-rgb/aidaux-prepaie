@@ -877,7 +877,9 @@ function setSyncStatus(state) {
 }
 
 async function pushSheet(agence, mois) {
-  const rows = (store[agence] && store[agence][mois]) || [];
+  // sécurité : jamais d'envoi d'une feuille absente de la mémoire (ça l'effacerait)
+  if (!store[agence] || !Array.isArray(store[agence][mois])) return;
+  const rows = store[agence][mois];
   setSyncStatus("saving");
   try {
     const resp = await fetch(
@@ -901,7 +903,8 @@ async function pushSheet(agence, mois) {
 function flushPendingSaveNow() {
   if (!pendingSave) return;
   const { agence, mois } = pendingSave;
-  const rows = (store[agence] && store[agence][mois]) || [];
+  if (!store[agence] || !Array.isArray(store[agence][mois])) { pendingSave = null; return; }
+  const rows = store[agence][mois];
   const url = "/api/sheet?agence=" + encodeURIComponent(agence) + "&mois=" + encodeURIComponent(mois);
   try {
     if (navigator.sendBeacon) {
@@ -972,10 +975,13 @@ async function reprendreNon(agence, mois, rows, depth) {
       r._nonRepris = true;
       change = true;
     }
-    if (!r._avRepris) {
-      const c = contratPrec[cle];
-      if (c) { r.contrat = c; r._contratCdi = c; }
-      r._avRepris = true;
+    // Contrat repris dès que l'avenant CDI du mois d'avant est posé ou change
+    // (et plus seulement la toute première fois que le mois est ouvert).
+    // _avSource = valeur déjà reprise : si on corrige le contrat à la main
+    // ensuite, on ne l'écrase pas tant que l'avenant d'avant ne change pas.
+    const c = contratPrec[cle];
+    if (c && r._avSource !== c) {
+      r.contrat = c; r._contratCdi = c; r._avSource = c;
       change = true;
     }
   });
@@ -1063,6 +1069,17 @@ async function supprimerDansMoisSuivants(agence, mois, nom) {
 // Bascule l'agence/le mois affiché : charge la feuille depuis le serveur
 // (avec petit indicateur de chargement) puis affiche.
 async function switchSheet(agence, mois) {
+  // on enregistre tout de suite ce qui était en attente, puis on oublie les
+  // copies en mémoire des mois depuis octobre 2026 : ils sont rechargés à jour
+  // (avenant CDI coché, « NON », etc. repris du mois d'avant à chaque ouverture)
+  if (pendingSave) {
+    const ps = pendingSave;
+    if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+    await pushSheet(ps.agence, ps.mois); // attendu : le mois d'avant est bien à jour côté serveur
+  }
+  if (store[agence]) Object.keys(store[agence]).forEach(m => {
+    if (moisIndex(m) >= moisIndex("Octobre 2026")) delete store[agence][m];
+  });
   curAgence = agence;
   curMois = mois;
   const tbody = document.getElementById("tbody");
