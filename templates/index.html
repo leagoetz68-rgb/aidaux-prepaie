@@ -93,6 +93,12 @@
     box-shadow: var(--shadow-sm);
   }
   .toolbar > .btn { padding: 10px 14px; white-space: nowrap; }
+  /* Alignement : boutons et listes déroulantes sur la même ligne de base, à la même hauteur */
+  @media (min-width: 701px) {
+    .toolbar { align-items: flex-end; }
+    .toolbar select, .toolbar > .btn { height: 44px; box-sizing: border-box; }
+    .toolbar > .btn { padding-top: 0; padding-bottom: 0; }
+  }
   .toolbar > .spacer + .btn { margin-left: 0; }
   .field { display: flex; flex-direction: column; gap: 5px; }
   .field label {
