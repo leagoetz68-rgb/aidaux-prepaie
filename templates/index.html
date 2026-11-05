@@ -1670,11 +1670,16 @@ function ficheProche(cle, fiches) {
 function chargerXlsx() {
   if (window.XLSX) return Promise.resolve();
   return new Promise((ok, ko) => {
-    const s = document.createElement("script");
-    s.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
-    s.onload = () => window.XLSX ? ok() : ko(new Error("xlsx"));
-    s.onerror = () => ko(new Error("xlsx"));
-    document.head.appendChild(s);
+    // copie locale de la bibliothèque (static/), sinon cdnjs en secours
+    const essayer = (srcs) => {
+      if (!srcs.length) return ko(new Error("xlsx"));
+      const s = document.createElement("script");
+      s.src = srcs[0];
+      s.onload = () => window.XLSX ? ok() : essayer(srcs.slice(1));
+      s.onerror = () => essayer(srcs.slice(1));
+      document.head.appendChild(s);
+    };
+    essayer(["/static/xlsx.full.min.js", "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"]);
     setTimeout(() => ko(new Error("délai")), 8000);
   });
 }
@@ -1739,7 +1744,7 @@ function afficherCommandeSwile(mois, lignes) {
       <div><h3 style="margin:0">Commande Swile – ${h(mois)}</h3><small id="swTot" style="color:#555"></small></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn" data-a="xlsx">⬇ Excel (.xlsx)</button>
-        <button class="btn secondary" data-a="csv">⬇ CSV</button>
+        <button class="btn ghost" data-a="csv" title="Fichier texte : s\'ouvre mal dans Excel en ligne">⬇ CSV (texte)</button>
         <button class="btn ghost" data-a="fermer">Fermer</button></div></div>
     <div style="font-size:12px;color:#555;margin-bottom:6px">Remplir le tableau ci dessous avec l'aide du site · Les cases sont modifiables (en rouge : date de naissance manquante).</div>
     <div style="overflow:auto;border:1px solid #d0d7de;border-radius:6px">
