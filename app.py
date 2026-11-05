@@ -127,6 +127,73 @@ def api_put_sheet():
     return jsonify({"ok": True})
 
 
+# ---- Commande Swile : fiche de chaque salarié (civilité, email, naissance) ----
+# Sert à produire le fichier de commande au format exact demandé par Swile.
+def init_swile_db():
+    conn = auth._conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS prepaie_swile (
+                    cle TEXT PRIMARY KEY,
+                    civilite TEXT NOT NULL DEFAULT '',
+                    prenom TEXT NOT NULL DEFAULT '',
+                    nom TEXT NOT NULL DEFAULT '',
+                    email TEXT NOT NULL DEFAULT '',
+                    naissance TEXT NOT NULL DEFAULT '',
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+                )
+                """
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+init_swile_db()
+CHAMPS_SWILE = ("civilite", "prenom", "nom", "email", "naissance")
+
+
+@app.route("/api/swile", methods=["GET"])
+def api_get_swile():
+    conn = auth._conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT cle, civilite, prenom, nom, email, naissance FROM prepaie_swile")
+            rows = cur.fetchall()
+    finally:
+        conn.close()
+    return jsonify({"salaries": [dict(zip(("cle",) + CHAMPS_SWILE, r)) for r in rows]})
+
+
+@app.route("/api/swile", methods=["PUT", "POST"])
+def api_put_swile():
+    body = request.get_json(silent=True) or {}
+    conn = auth._conn()
+    try:
+        with conn.cursor() as cur:
+            for s in body.get("salaries") or []:
+                cle = str(s.get("cle") or "").strip()
+                if not cle:
+                    continue
+                v = [str(s.get(k) or "").strip() for k in CHAMPS_SWILE]
+                cur.execute(
+                    """
+                    INSERT INTO prepaie_swile (cle, civilite, prenom, nom, email, naissance, updated_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, now())
+                    ON CONFLICT (cle) DO UPDATE SET civilite = EXCLUDED.civilite,
+                        prenom = EXCLUDED.prenom, nom = EXCLUDED.nom, email = EXCLUDED.email,
+                        naissance = EXCLUDED.naissance, updated_at = now()
+                    """,
+                    [cle] + v,
+                )
+        conn.commit()
+    finally:
+        conn.close()
+    return jsonify({"ok": True})
+
+
 # (L'ancienne adresse /api/admin/reset-sheets, qui effaçait toutes les feuilles
 # d'un simple clic, a été retirée.)
 
