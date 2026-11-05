@@ -1667,6 +1667,18 @@ function ficheProche(cle, fiches) {
   return bestD <= 2 ? best : null;
 }
 
+function chargerXlsx() {
+  if (window.XLSX) return Promise.resolve();
+  return new Promise((ok, ko) => {
+    const s = document.createElement("script");
+    s.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+    s.onload = () => window.XLSX ? ok() : ko(new Error("xlsx"));
+    s.onerror = () => ko(new Error("xlsx"));
+    document.head.appendChild(s);
+    setTimeout(() => ko(new Error("délai")), 8000);
+  });
+}
+
 async function exportTickets() {
   const mois = curMois;
   const tickets = await ticketsDuMois(mois);
@@ -1712,12 +1724,33 @@ async function exportTickets() {
     total += n;
     lignes.push([f.civilite || "MME", f.prenom, f.nom, f.email, f.naissance, String(n).replace(".", ",")].map(propre).join(";"));
   });
-  const blob = new Blob([versWindows1252(lignes.join("\r\n") + "\r\n")], { type: "text/csv;charset=windows-1252" });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = "COMMANDE_SWILE_" + mois.replace(/\s+/g, "_") + ".csv";
-  document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  const nomFichier = "COMMANDE_SWILE_" + mois.replace(/\s+/g, "_");
+  const telecharger = (blob, nom) => {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = nom;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  };
+  // Vrai fichier Excel (colonnes séparées, s'ouvre bien dans Excel en ligne) ;
+  // si la bibliothèque Excel ne se charge pas, repli sur le CSV au format Swile.
+  try {
+    await chargerXlsx();
+    const tableau = lignes.map((l, i) => {
+      if (i === 0) return [l];
+      const c = l.split(";");
+      if (i >= 2) c[5] = Number(String(c[5]).replace(",", ".")) || 0;
+      return c;
+    });
+    const ws = XLSX.utils.aoa_to_sheet(tableau);
+    ws["!cols"] = [{ wch: 11 }, { wch: 16 }, { wch: 20 }, { wch: 34 }, { wch: 26 }, { wch: 26 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Commande");
+    const donnees = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+    telecharger(new Blob([donnees], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), nomFichier + ".xlsx");
+  } catch (e) {
+    telecharger(new Blob([versWindows1252(lignes.join("\r\n") + "\r\n")], { type: "text/csv;charset=windows-1252" }), nomFichier + ".csv");
+  }
   const avec = liste.filter(f => (tickets[f.cle] || {}).n).length;
   alert("Commande Swile " + mois + " : " + avec + " salarié(s), " + total + " jour(s) à charger.");
 }
