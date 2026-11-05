@@ -506,7 +506,7 @@ tbody td.cdicdd-td{padding:0 8px;width:1%;white-space:nowrap;text-align:center}
       <button class="btn ghost" id="addRow2"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Ajouter un salarié</button>
       <button class="btn secondary" id="exportCsv"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>Export CSV</button>
       <button class="btn secondary" id="calcTickets" title="Calcule les tickets resto depuis le planning Ximi"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 12h.01M12 12h.01M16 12h.01M8 16h.01M12 16h.01M16 16h.01"/></svg>Calculer tickets</button>
-      <button class="btn secondary" id="exportTickets" title="Fichier à envoyer pour la commande des tickets resto"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8a2 2 0 0 0 2-2h12a2 2 0 0 0 2 2v8a2 2 0 0 0-2 2H6a2 2 0 0 0-2-2z"/><path d="M10 6v12" stroke-dasharray="2 2"/></svg>Commande tickets</button>
+      <button class="btn secondary" id="exportTickets" title="Fichier de commande Swile (toutes agences, mois affiché)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8a2 2 0 0 0 2-2h12a2 2 0 0 0 2 2v8a2 2 0 0 0-2 2H6a2 2 0 0 0-2-2z"/><path d="M10 6v12" stroke-dasharray="2 2"/></svg>Commande tickets</button>
       <button class="btn ghost" id="printBtn"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 9V4h10v5M7 17H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2"/><rect x="7" y="14" width="10" height="7" rx="1"/></svg>Imprimer</button>
     </div>
 
@@ -1552,112 +1552,174 @@ function exportCsv() {
   URL.revokeObjectURL(url);
 }
 
-// ---- Commande tickets resto : nom + nombre de tickets, uniquement ----
-// Ne garde que les salariés qui ont un nombre saisi dans la case Ticket resto
-// (les cases « NON » ou bloquées sont vides, donc ignorées).
-// Ouvre une page mise en forme, à imprimer ou enregistrer en PDF.
-function exportTickets() {
-  const rows = getSheet(curAgence, curMois);
-  const lignes = [];
+// ---- Commande tickets resto : fichier au format Swile ----
+// Produit exactement la trame Swile (COMMANDE_SWILE) : 1re ligne de consigne,
+// puis MR ou MME;PRENOM;NOM;EMAIL;DATE NAISSANCE;NOMBRE JOURS À CHARGER.
+// Tous les salariés connus de Swile sont listés (0 s'ils n'ont pas de ticket),
+// toutes agences confondues pour le mois affiché. Civilité, email et date de
+// naissance viennent de la fiche Swile enregistrée (table prepaie_swile) ;
+// s'il manque un salarié qui a des tickets, on les demande avant l'export.
+const cleSwile = n => String(n || "").normalize("NFD").replace(/[̀-ͯ]/g, "")
+  .toLowerCase().replace(/[^a-z]+/g, " ").trim().split(" ").filter(Boolean).sort().join(" ");
+
+async function ticketsDuMois(mois) {
+  const parCle = {};
+  for (const agence of Object.keys(AGENCES)) {
+    let rows = null;
+    try {
+      const r = await fetch("/api/sheet?agence=" + encodeURIComponent(agence) + "&mois=" + encodeURIComponent(mois));
+      if (r.ok) rows = (await r.json()).rows;
+    } catch (e) {}
+    if (!Array.isArray(rows)) rows = (store[agence] || {})[mois];
+    if (agence === curAgence && mois === curMois) rows = getSheet(agence, mois); // version à l'écran
+    (rows || []).forEach(r => {
+      const nom = String(r.nom || "").trim();
+      if (!nom) return;
+      if (r._hl && TICKET_MARKS.indexOf(r._hl.trNbre) >= 0) return; // « NON »
+      const n = parseFloat(String(r.trNbre || "").replace(",", "."));
+      if (isNaN(n) || n <= 0) return;
+      const k = cleSwile(nom);
+      parCle[k] = parCle[k] || { nom: nom, n: 0 };
+      parCle[k].n += n;
+    });
+  }
+  return parCle;
+}
+
+function demanderFichesSwile(manquants) {
+  // petite fenêtre : civilité, prénom, nom, email, date de naissance
+  return new Promise(resolve => {
+    const fond = document.createElement("div");
+    fond.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px";
+    const h = v => String(v || "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+    const lignes = manquants.map((m, i) => {
+      const mots = m.nom.split(/\s+/);
+      const majs = mots.filter(w => w === w.toUpperCase() && /[A-Z]/.test(w));
+      const nom = majs.length ? majs.join(" ") : mots[0];
+      const prenom = mots.filter(w => majs.length ? majs.indexOf(w) < 0 : w !== mots[0]).join(" ");
+      return `<tr data-i="${i}"><td><select data-k="civilite"><option>MME</option><option>MR</option></select></td>
+        <td><input data-k="prenom" value="${h(prenom)}" size="10"></td><td><input data-k="nom" value="${h(nom)}" size="12"></td>
+        <td><input data-k="email" type="email" placeholder="email" size="20"></td>
+        <td><input data-k="naissance" placeholder="JJ/MM/AAAA" size="10"></td><td>${m.n}</td></tr>`;
+    }).join("");
+    fond.innerHTML = `<div style="background:#fff;border-radius:12px;padding:18px;max-width:900px;width:100%;max-height:90vh;overflow:auto;font:14px sans-serif">
+      <h3 style="margin:0 0 6px">Salariés inconnus de Swile</h3>
+      <p style="margin:0 0 12px;color:#555">Ces salariés ont des tickets ce mois-ci mais pas encore de fiche Swile. Complétez-les une fois : ils seront retenus pour les prochaines commandes.</p>
+      <table style="border-collapse:collapse;width:100%"><tr style="text-align:left"><th>Civ.</th><th>Prénom</th><th>Nom</th><th>Email</th><th>Naissance</th><th>Jours</th></tr>${lignes}</table>
+      <p id="swErr" style="color:#b42318;margin:10px 0 0"></p>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+        <button class="btn ghost" data-a="non">Annuler</button><button class="btn" data-a="ok">Enregistrer et exporter</button></div></div>`;
+    document.body.appendChild(fond);
+    fond.addEventListener("click", ev => {
+      const a = ev.target.dataset && ev.target.dataset.a;
+      if (a === "non") { fond.remove(); resolve(null); }
+      if (a !== "ok") return;
+      const fiches = [];
+      let err = "";
+      fond.querySelectorAll("tr[data-i]").forEach(tr => {
+        const f = {};
+        tr.querySelectorAll("[data-k]").forEach(el => f[el.dataset.k] = el.value.trim());
+        if (!f.prenom || !f.nom || !f.email) err = "Prénom, nom et email sont obligatoires.";
+        else if (f.naissance && !/^\d{2}\/\d{2}\/\d{4}$/.test(f.naissance)) err = "Date de naissance au format JJ/MM/AAAA.";
+        f.cle = cleSwile(manquants[+tr.dataset.i].nom);
+        fiches.push(f);
+      });
+      if (err) { fond.querySelector("#swErr").textContent = err; return; }
+      fond.remove(); resolve(fiches);
+    });
+  });
+}
+
+// Encodage Windows-1252 (celui du fichier Swile d'origine, lu correctement par Excel)
+function versWindows1252(texte) {
+  const special = { "€":0x80,"‚":0x82,"ƒ":0x83,"„":0x84,"…":0x85,"†":0x86,"‡":0x87,"ˆ":0x88,"‰":0x89,"Š":0x8A,"‹":0x8B,"Œ":0x8C,"Ž":0x8E,
+    "‘":0x91,"’":0x92,"“":0x93,"”":0x94,"•":0x95,"–":0x96,"—":0x97,"˜":0x98,"™":0x99,"š":0x9A,"›":0x9B,"œ":0x9C,"ž":0x9E,"Ÿ":0x9F };
+  const out = new Uint8Array(texte.length);
+  for (let i = 0; i < texte.length; i++) {
+    const ch = texte[i], code = ch.charCodeAt(0);
+    out[i] = special[ch] !== undefined ? special[ch] : (code < 256 ? code : 0x3F);
+  }
+  return out;
+}
+
+function distance(a, b) {
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i]);
+  for (let j = 1; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++)
+    d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+  return d[a.length][b.length];
+}
+function ficheProche(cle, fiches) {
+  const mots = cle.split(" ");
+  let best = null, bestD = 99;
+  fiches.forEach(f => {
+    const fm = f.cle.split(" ");
+    // l'un contient tous les mots de l'autre (ex. prénom absent)
+    const inclus = (x, y) => x.length >= 2 && x.every(w => y.indexOf(w) >= 0);
+    let dd = (inclus(mots, fm) || inclus(fm, mots)) ? 0 : distance(cle, f.cle);
+    // même nombre de mots, chacun presque identique (Leonhart / Leohnardt)
+    if (dd > 2 && mots.length === fm.length && mots.length >= 2) {
+      const ds = mots.map(w => Math.min.apply(null, fm.map(v => distance(w, v))));
+      if (mots.every((w, i) => ds[i] <= (w.length >= 7 ? 3 : 1)) && ds.filter(x => x > 0).length <= 1) dd = 2;
+    }
+    if (dd < bestD) { bestD = dd; best = f; }
+  });
+  return bestD <= 2 ? best : null;
+}
+
+async function exportTickets() {
+  const mois = curMois;
+  const tickets = await ticketsDuMois(mois);
+  let fiches = [];
+  try {
+    const r = await fetch("/api/swile");
+    if (!r.ok) throw new Error();
+    fiches = (await r.json()).salaries || [];
+  } catch (e) { alert("Impossible de lire les fiches Swile, réessaie."); return; }
+  const connues = {};
+  fiches.forEach(f => connues[f.cle] = f);
+  // Nom écrit un peu différemment (Leonhart / Leohnardt, prénom absent...) :
+  // on rattache les tickets à la fiche Swile la plus proche.
+  Object.keys(tickets).forEach(k => {
+    if (connues[k]) return;
+    const proche = ficheProche(k, fiches);
+    if (!proche) return;
+    if (tickets[proche.cle]) tickets[proche.cle].n += tickets[k].n;
+    else tickets[proche.cle] = tickets[k];
+    delete tickets[k];
+  });
+  const manquants = Object.keys(tickets).filter(k => !connues[k]).map(k => tickets[k]);
+  if (manquants.length) {
+    const nouvelles = await demanderFichesSwile(manquants);
+    if (!nouvelles) return;
+    try {
+      const r = await fetch("/api/swile", { method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ salaries: nouvelles }) });
+      if (!r.ok) throw new Error();
+    } catch (e) { alert("Impossible d'enregistrer les fiches Swile, réessaie."); return; }
+    nouvelles.forEach(f => connues[f.cle] = f);
+  }
+  const liste = Object.values(connues).sort((a, b) =>
+    a.nom.localeCompare(b.nom, "fr", { sensitivity: "base" }) || a.prenom.localeCompare(b.prenom, "fr"));
+  const propre = v => String(v || "").replace(/[;\r\n]+/g, " ").trim();
+  const lignes = [
+    "Remplir le tableau ci dessous avec l'aide du site",
+    "MR ou MME;PRENOM;NOM;EMAIL;DATE NAISSANCE (JJ/MM/AAAA);NOMBRE JOURS À CHARGER",
+  ];
   let total = 0;
-  rows.forEach(r => {
-    const nom = String(r.nom || "").trim();
-    const nb = String(r.trNbre || "").trim();
-    if (!nom || !nb) return;
-    const n = parseFloat(nb.replace(",", "."));
-    if (!isNaN(n)) { if (n <= 0) return; total += n; }
-    lignes.push([nom, nb]);
+  liste.forEach(f => {
+    const n = (tickets[f.cle] || {}).n || 0;
+    total += n;
+    lignes.push([f.civilite || "MME", f.prenom, f.nom, f.email, f.naissance, String(n).replace(".", ",")].map(propre).join(";"));
   });
-  if (!lignes.length) {
-    alert("Aucun ticket resto saisi pour " + AGENCES[curAgence].nom + " – " + curMois + ".");
-    return;
-  }
-  const h = v => String(v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  const agence = AGENCES[curAgence].nom;
-  const date = new Date().toLocaleDateString("fr-FR");
-  const trs = lignes.map((l, i) =>
-    "<tr" + (i % 2 ? ' class="alt"' : "") + "><td>" + h(l[0]) + "</td><td class=\"n\">" + h(l[1]) + "</td></tr>"
-  ).join("");
-  const html = `<!doctype html><html lang="fr"><head><meta charset="utf-8">
-<title>Commande tickets resto – ${h(agence)} – ${h(curMois)}</title>
-<style>
-  body { font-family: "Segoe UI", Arial, sans-serif; color: #1f2a44; margin: 40px auto; max-width: 620px; padding: 0 16px; }
-  .top { display: flex; align-items: center; gap: 16px; border-bottom: 3px solid #0e8a8a; padding-bottom: 14px; }
-  .top img { height: 54px; }
-  h1 { font-size: 22px; margin: 0; }
-  .meta { color: #5b6478; font-size: 14px; margin-top: 4px; }
-  table { width: 100%; border-collapse: collapse; margin-top: 24px; font-size: 15px; }
-  th { background: #1f2a44; color: #fff; text-align: left; padding: 10px 14px; }
-  td { padding: 9px 14px; border-bottom: 1px solid #e3e6ee; }
-  tr.alt td { background: #f4f7fa; }
-  .n { text-align: center; width: 160px; }
-  tr.total td { font-weight: 700; background: #e3f3f3; border-top: 2px solid #0e8a8a; border-bottom: none; }
-  .foot { margin-top: 18px; color: #8a92a6; font-size: 12px; }
-  .actions { margin-top: 28px; text-align: center; }
-  button { background: #0e8a8a; color: #fff; border: 0; border-radius: 6px; padding: 10px 20px; font-size: 15px; cursor: pointer; }
-  button[disabled] { opacity: .6; cursor: wait; }
-  @media print { .actions { display: none; } body { margin: 0 auto; } }
-</style></head><body>
-<div class="top"><img src="${location.origin}/logo.png" alt="" onerror="this.remove()">
-<div><h1>Commande tickets restaurant</h1><div class="meta">Agence ${h(agence)} · ${h(curMois)}</div></div></div>
-<table><thead><tr><th>Salarié</th><th class="n">Nombre de tickets</th></tr></thead>
-<tbody>${trs}<tr class="total"><td>TOTAL (${lignes.length} salarié${lignes.length > 1 ? "s" : ""})</td><td class="n">${h(String(total).replace(".", ","))}</td></tr></tbody></table>
-<div class="foot">Document généré le ${date}</div>
-<div class="actions"><button id="pdf" disabled>Préparation du PDF…</button></div>
-<script>
-const D = ${JSON.stringify({ agence, mois: curMois, date, total: String(total).replace(".", ","), lignes }).replace(/</g, "\\u003c")};
-const bouton = document.getElementById("pdf");
-function telecharger() {
-  const doc = new jspdf.jsPDF({ unit: "mm", format: "a4" });
-  const logo = document.querySelector(".top img");
-  let x = 20;
-  if (logo && logo.complete && logo.naturalWidth) {
-    try { const h = 18, w = h * logo.naturalWidth / logo.naturalHeight; doc.addImage(logo, "PNG", 20, 14, w, h); x = 24 + w; } catch (e) {}
-  }
-  doc.setFont("helvetica", "bold"); doc.setFontSize(17); doc.setTextColor(31, 42, 68);
-  doc.text("Commande tickets restaurant", x, 22);
-  doc.setFont("helvetica", "normal"); doc.setFontSize(10.5); doc.setTextColor(91, 100, 120);
-  doc.text("Agence " + D.agence + " · " + D.mois, x, 29);
-  doc.setDrawColor(14, 138, 138); doc.setLineWidth(0.8); doc.line(20, 36, 190, 36);
-  doc.autoTable({
-    startY: 42, margin: { left: 20, right: 20 },
-    head: [["Salarié", { content: "Nombre de tickets", styles: { halign: "center" } }]],
-    body: D.lignes,
-    foot: [["TOTAL (" + D.lignes.length + " salarié" + (D.lignes.length > 1 ? "s" : "") + ")",
-            { content: D.total, styles: { halign: "center" } }]],
-    styles: { fontSize: 10.5, cellPadding: 3, textColor: [31, 42, 68] },
-    headStyles: { fillColor: [31, 42, 68], textColor: 255 },
-    footStyles: { fillColor: [227, 243, 243], textColor: [31, 42, 68], fontStyle: "bold" },
-    alternateRowStyles: { fillColor: [244, 247, 250] },
-    columnStyles: { 1: { halign: "center", cellWidth: 45 } },
-  });
-  doc.setFontSize(8.5); doc.setTextColor(138, 146, 166);
-  doc.text("Document généré le " + D.date, 20, doc.lastAutoTable.finalY + 8);
-  doc.save("Commande tickets resto - " + D.agence + " - " + D.mois + ".pdf");
-}
-// bibliothèque PDF chargée sans bloquer la page ; si elle n'arrive pas en 6 s
-// (réseau filtré...), on se rabat sur l'impression du navigateur
-function charger(src, suite) {
-  const s = document.createElement("script");
-  s.src = src; s.onload = suite; s.onerror = suite;
-  document.head.appendChild(s);
-}
-charger("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js", () =>
-  charger("https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js", () => {}));
-(function pret(n) {
-  if (window.jspdf && window.jspdf.jsPDF && window.jspdf.jsPDF.API.autoTable) {
-    bouton.disabled = false; bouton.textContent = "⬇ Télécharger le PDF"; bouton.onclick = telecharger;
-  } else if (n > 60) {
-    bouton.disabled = false; bouton.textContent = "Imprimer / Enregistrer en PDF"; bouton.onclick = () => window.print();
-  } else setTimeout(() => pret(n + 1), 100);
-})(0);
-<\/script>
-</body></html>`;
-  const w = window.open("", "_blank");
-  if (!w) { alert("Autorisez les fenêtres pop-up pour ce site afin d'afficher la commande."); return; }
-  w.document.open();
-  w.document.write(html);
-  w.document.close();
+  const blob = new Blob([versWindows1252(lignes.join("\r\n") + "\r\n")], { type: "text/csv;charset=windows-1252" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "COMMANDE_SWILE_" + mois.replace(/\s+/g, "_") + ".csv";
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  const avec = liste.filter(f => (tickets[f.cle] || {}).n).length;
+  alert("Commande Swile " + mois + " : " + avec + " salarié(s), " + total + " jour(s) à charger.");
 }
 
 // ---- Tickets resto calculés depuis le planning Ximi ----
