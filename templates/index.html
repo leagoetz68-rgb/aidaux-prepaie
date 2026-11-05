@@ -1088,6 +1088,60 @@ async function supprimerDansMoisSuivants(agence, mois, nom) {
     ", mais pas de tous les mois suivants (problème de connexion). Réessaie ou vérifie les mois suivants.");
 }
 
+// ---- Ajout (ou renommage) d'un salarié : aussi dans les mois suivants ----
+// Un mois pas encore créé reprend la liste du mois d'avant, mais un mois
+// suivant DÉJÀ créé ne la reprenait pas : le salarié ajouté « disparaissait »
+// le mois d'après. On l'ajoute donc dans tous les mois suivants déjà créés
+// (2,5 s après la fin de la saisie du nom). _propage = nom déjà recopié.
+const propagationTimers = {};
+function planifierPropagation(row) {
+  const agence = curAgence, mois = curMois;
+  clearTimeout(propagationTimers[row._id]);
+  propagationTimers[row._id] = setTimeout(() => {
+    delete propagationTimers[row._id];
+    ajouterDansMoisSuivants(agence, mois, row);
+  }, 2500);
+}
+async function ajouterDansMoisSuivants(agence, mois, row) {
+  const nom = String(row.nom || "").trim();
+  const ancien = String(row._propage || "").trim();
+  const cle = nomCle(nom), cleAncien = nomCle(ancien);
+  const idx = moisIndex(mois);
+  if (!cle || cle === cleAncien || idx < 0) return;
+  const suivants = MOIS.filter(m => moisIndex(m) > idx)
+    .sort((a, b) => moisIndex(a) - moisIndex(b));
+  let erreur = false;
+  for (const m of suivants) {
+    const url = "/api/sheet?agence=" + encodeURIComponent(agence) + "&mois=" + encodeURIComponent(m);
+    try {
+      const resp = await fetch(url);
+      if (!resp.ok) { if (resp.status !== 404) erreur = true; continue; }
+      const data = await resp.json();
+      if (!Array.isArray(data.rows)) continue; // mois pas encore créé : il reprendra le mois d'avant
+      if (data.rows.some(r => nomCle(r.nom) === cle)) continue; // déjà présent
+      const renomme = cleAncien && data.rows.find(r => nomCle(r.nom) === cleAncien);
+      if (renomme) renomme.nom = nom; // faute de frappe corrigée : on renomme
+      else data.rows.push(emptyRow([nom, row.embauche, row.contrat]));
+      const put = await fetch(url, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rows: data.rows }),
+      });
+      if (!put.ok) erreur = true;
+    } catch (e) { erreur = true; }
+    // copie en mémoire : on l'oublie, elle sera rechargée à jour à l'ouverture du mois
+    if (store[agence]) delete store[agence][m];
+  }
+  if (erreur) {
+    alert("« " + nom + " » a été ajouté à " + mois +
+      ", mais pas à tous les mois suivants (problème de connexion). Réessaie ou vérifie les mois suivants.");
+    return;
+  }
+  row._propage = nom;
+  if (agence === curAgence && mois === curMois) saveStore();
+  else pushSheet(agence, mois);
+}
+
 // Bascule l'agence/le mois affiché : charge la feuille depuis le serveur
 // (avec petit indicateur de chargement) puis affiche.
 async function switchSheet(agence, mois) {
@@ -1102,11 +1156,17 @@ async function switchSheet(agence, mois) {
   if (store[agence]) Object.keys(store[agence]).forEach(m => {
     if (moisIndex(m) >= moisIndex("Octobre 2026")) delete store[agence][m];
   });
-  curAgence = agence;
-  curMois = mois;
-  const tbody = document.getElementById("tbody");
-  if (tbody) tbody.innerHTML = '<tr><td style="padding:18px;color:#7a8a99;">Chargement…</td></tr>';
-  await ensureSheetLoaded(agence, mois);
+  chargementFeuille = true;
+  try {
+    if (sortTimer) { clearTimeout(sortTimer); sortTimer = null; }
+    curAgence = agence;
+    curMois = mois;
+    const tbody = document.getElementById("tbody");
+    if (tbody) tbody.innerHTML = '<tr><td style="padding:18px;color:#7a8a99;">Chargement…</td></tr>';
+    await ensureSheetLoaded(agence, mois);
+  } finally {
+    chargementFeuille = false;
+  }
   render();
 }
 
@@ -1321,7 +1381,7 @@ function render() {
       inp.addEventListener("input", () => {
         row[col.key] = inp.value;
         saveStore();
-        if (col.type === "name") scheduleSort();
+        if (col.type === "name") { scheduleSort(); planifierPropagation(row); }
       });
       if (col.type === "name") {
         inp.addEventListener("blur", () => sortRowsNow());
@@ -1444,7 +1504,11 @@ function render() {
   }
 }
 
+let chargementFeuille = false;
 function sortRowsNow() {
+  // pendant un changement de mois, la case quittée ne doit pas redessiner
+  // (sinon le nouveau mois s'afficherait avec la liste de départ)
+  if (chargementFeuille) return;
   render(); // render() trie déjà systématiquement et restaure le focus
 }
 
