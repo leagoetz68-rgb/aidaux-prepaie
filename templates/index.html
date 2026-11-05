@@ -1713,18 +1713,65 @@ async function exportTickets() {
   }
   const liste = Object.values(connues).sort((a, b) =>
     a.nom.localeCompare(b.nom, "fr", { sensitivity: "base" }) || a.prenom.localeCompare(b.prenom, "fr"));
-  const propre = v => String(v || "").replace(/[;\r\n]+/g, " ").trim();
-  const lignes = [
-    "Remplir le tableau ci dessous avec l'aide du site",
-    "MR ou MME;PRENOM;NOM;EMAIL;DATE NAISSANCE (JJ/MM/AAAA);NOMBRE JOURS À CHARGER",
-  ];
-  let total = 0;
-  liste.forEach(f => {
-    const n = (tickets[f.cle] || {}).n || 0;
-    total += n;
-    lignes.push([f.civilite || "MME", f.prenom, f.nom, f.email, f.naissance, String(n).replace(".", ",")].map(propre).join(";"));
+  afficherCommandeSwile(mois, liste.map(f => Object.assign({}, f, { n: (tickets[f.cle] || {}).n || 0 })));
+}
+
+// ---- Tableau de commande Swile affiché dans l'app (modifiable) ----
+// Même colonnes que la trame Swile. Les corrections de civilité / prénom / nom /
+// email / naissance sont enregistrées pour les prochaines commandes ; le nombre
+// de jours modifié ici ne vaut que pour ce fichier.
+const ENTETE_SWILE = ["MR ou MME", "PRENOM", "NOM", "EMAIL", "DATE NAISSANCE (JJ/MM/AAAA)", "NOMBRE JOURS À CHARGER"];
+function afficherCommandeSwile(mois, lignes) {
+  const h = v => String(v == null ? "" : v).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+  const fond = document.createElement("div");
+  fond.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:12px";
+  const cellule = "border:1px solid #d0d7de;padding:0";
+  const champ = "width:100%;box-sizing:border-box;border:0;padding:6px 8px;font:13px sans-serif;background:transparent;text-align:left";
+  const corps = lignes.map((l, i) => `<tr data-i="${i}" style="${l.n ? "background:#eef9f6" : ""}">
+      <td style="${cellule}"><select data-k="civilite" style="${champ}"><option${l.civilite === "MME" ? " selected" : ""}>MME</option><option${l.civilite === "MR" ? " selected" : ""}>MR</option></select></td>
+      <td style="${cellule}"><input data-k="prenom" value="${h(l.prenom)}" style="${champ}"></td>
+      <td style="${cellule}"><input data-k="nom" value="${h(l.nom)}" style="${champ}"></td>
+      <td style="${cellule}"><input data-k="email" value="${h(l.email)}" style="${champ}"></td>
+      <td style="${cellule}"><input data-k="naissance" value="${h(l.naissance)}" placeholder="JJ/MM/AAAA" style="${champ}${l.naissance ? "" : ";background:#fdecea"}"></td>
+      <td style="${cellule}"><input data-k="n" value="${h(l.n)}" inputmode="decimal" style="${champ};text-align:right;font-weight:700"></td></tr>`).join("");
+  fond.innerHTML = `<div style="background:#fff;border-radius:12px;padding:16px;max-width:1100px;width:100%;max-height:94vh;display:flex;flex-direction:column;font:14px sans-serif">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px">
+      <div><h3 style="margin:0">Commande Swile – ${h(mois)}</h3><small id="swTot" style="color:#555"></small></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn" data-a="xlsx">⬇ Excel (.xlsx)</button>
+        <button class="btn secondary" data-a="csv">⬇ CSV</button>
+        <button class="btn ghost" data-a="fermer">Fermer</button></div></div>
+    <div style="font-size:12px;color:#555;margin-bottom:6px">Remplir le tableau ci dessous avec l'aide du site · Les cases sont modifiables (en rouge : date de naissance manquante).</div>
+    <div style="overflow:auto;border:1px solid #d0d7de;border-radius:6px">
+      <table style="border-collapse:collapse;width:100%;min-width:760px">
+        <thead><tr>${ENTETE_SWILE.map(t => `<th style="position:sticky;top:0;background:#1f2a44;color:#fff;text-align:left;padding:7px 8px;font-size:12px">${t}</th>`).join("")}</tr></thead>
+        <tbody>${corps}</tbody></table></div></div>`;
+  document.body.appendChild(fond);
+
+  const lire = () => Array.from(fond.querySelectorAll("tr[data-i]")).map(tr => {
+    const l = Object.assign({}, lignes[+tr.dataset.i]);
+    tr.querySelectorAll("[data-k]").forEach(el => l[el.dataset.k] = el.value.trim());
+    l.n = Number(String(l.n).replace(",", ".")) || 0;
+    return l;
   });
-  const nomFichier = "COMMANDE_SWILE_" + mois.replace(/\s+/g, "_");
+  const majTotal = () => {
+    const ls = lire();
+    fond.querySelector("#swTot").textContent = ls.filter(l => l.n).length + " salarié(s) avec tickets · " +
+      ls.reduce((s, l) => s + l.n, 0) + " jour(s) à charger";
+  };
+  majTotal();
+  fond.addEventListener("input", majTotal);
+
+  const enregistrerFiches = async ls => {
+    const modifiees = ls.filter((l, i) => ["civilite", "prenom", "nom", "email", "naissance"]
+      .some(k => String(l[k] || "") !== String(lignes[i][k] || "")));
+    if (!modifiees.length) return;
+    try {
+      await fetch("/api/swile", { method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ salaries: modifiees }) });
+      modifiees.forEach(m => Object.assign(lignes[ls.indexOf(m)], m));
+    } catch (e) {}
+  };
   const telecharger = (blob, nom) => {
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
@@ -1732,27 +1779,34 @@ async function exportTickets() {
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 5000);
   };
-  // Vrai fichier Excel (colonnes séparées, s'ouvre bien dans Excel en ligne) ;
-  // si la bibliothèque Excel ne se charge pas, repli sur le CSV au format Swile.
-  try {
-    await chargerXlsx();
-    const tableau = lignes.map((l, i) => {
-      if (i === 0) return [l];
-      const c = l.split(";");
-      if (i >= 2) c[5] = Number(String(c[5]).replace(",", ".")) || 0;
-      return c;
-    });
-    const ws = XLSX.utils.aoa_to_sheet(tableau);
-    ws["!cols"] = [{ wch: 11 }, { wch: 16 }, { wch: 20 }, { wch: 34 }, { wch: 26 }, { wch: 26 }];
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Commande");
-    const donnees = XLSX.write(wb, { bookType: "xlsx", type: "array" });
-    telecharger(new Blob([donnees], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), nomFichier + ".xlsx");
-  } catch (e) {
-    telecharger(new Blob([versWindows1252(lignes.join("\r\n") + "\r\n")], { type: "text/csv;charset=windows-1252" }), nomFichier + ".csv");
-  }
-  const avec = liste.filter(f => (tickets[f.cle] || {}).n).length;
-  alert("Commande Swile " + mois + " : " + avec + " salarié(s), " + total + " jour(s) à charger.");
+  const nomFichier = "COMMANDE_SWILE_" + mois.replace(/\s+/g, "_");
+  const tableau = ls => [["Remplir le tableau ci dessous avec l'aide du site"], ENTETE_SWILE]
+    .concat(ls.map(l => [l.civilite || "MME", l.prenom, l.nom, l.email, l.naissance, l.n]));
+
+  fond.addEventListener("click", async ev => {
+    const a = ev.target.dataset && ev.target.dataset.a;
+    if (!a) return;
+    if (a === "fermer") { fond.remove(); return; }
+    const ls = lire();
+    await enregistrerFiches(ls);
+    if (a === "csv") {
+      const propre = v => String(v == null ? "" : v).replace(/[;\r\n]+/g, " ").trim();
+      const txt = tableau(ls).map((r, i) => i === 0 ? r[0] : r.map((v, j) => j === 5 && i >= 2 ? String(v).replace(".", ",") : propre(v)).join(";")).join("\r\n") + "\r\n";
+      telecharger(new Blob([versWindows1252(txt)], { type: "text/csv;charset=windows-1252" }), nomFichier + ".csv");
+      return;
+    }
+    try {
+      await chargerXlsx();
+      const ws = XLSX.utils.aoa_to_sheet(tableau(ls));
+      ws["!cols"] = [{ wch: 11 }, { wch: 16 }, { wch: 20 }, { wch: 34 }, { wch: 26 }, { wch: 26 }];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Commande");
+      telecharger(new Blob([XLSX.write(wb, { bookType: "xlsx", type: "array" })],
+        { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), nomFichier + ".xlsx");
+    } catch (e) {
+      alert("Le format Excel n'a pas pu se charger (connexion). Utilisez le bouton CSV.");
+    }
+  });
 }
 
 // ---- Tickets resto calculés depuis le planning Ximi ----
