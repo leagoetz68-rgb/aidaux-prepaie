@@ -1769,7 +1769,7 @@ function chargerExcelJS() {
       s.onerror = () => essayer(srcs.slice(1));
       document.head.appendChild(s);
     };
-    essayer(["/static/exceljs.min.js", "https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"]);
+    essayer(["https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js", "https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js", "/static/exceljs.min.js"]);
     setTimeout(() => ko(new Error("délai")), 10000);
   });
 }
@@ -1788,7 +1788,7 @@ async function excelCommandeSwile(ls) {
     rows: lignes.length ? lignes : [["", "", "", "", "", 0]],
   });
   ws.getRow(2).eachCell(c => {
-    c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF203864" } };
+    c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF24408E" } };
     c.font = { name: "Calibri", size: 11, bold: true, color: { argb: "FFFFFFFF" } };
     c.alignment = { horizontal: "center", vertical: "middle" };
   });
@@ -1864,15 +1864,16 @@ function afficherCommandeSwile(mois, lignes) {
   const h = v => String(v == null ? "" : v).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
   const fond = document.createElement("div");
   fond.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:12px";
-  const cellule = "border:1px solid #d0d7de;padding:0";
-  const champ = "width:100%;box-sizing:border-box;border:0;padding:6px 8px;font:13px sans-serif;background:transparent;text-align:left";
-  const corps = lignes.map((l, i) => `<tr data-i="${i}" style="${l.n ? "background:#eef9f6" : ""}">
+  // aspect « Excel » : Calibri 11, quadrillage gris clair, lignes fines
+  const cellule = "border:1px solid #e1e1e1;padding:0;height:20px";
+  const champ = "width:100%;box-sizing:border-box;border:0;padding:1px 3px;font:11pt Calibri,Carlito,Arial,sans-serif;color:#000;background:transparent;text-align:left";
+  const corps = lignes.map((l, i) => `<tr data-i="${i}">
       <td style="${cellule}"><select data-k="civilite" style="${champ}"><option${l.civilite === "MME" ? " selected" : ""}>MME</option><option${l.civilite === "MR" ? " selected" : ""}>MR</option></select></td>
       <td style="${cellule}"><input data-k="prenom" value="${h(l.prenom)}" style="${champ}"></td>
       <td style="${cellule}"><input data-k="nom" value="${h(l.nom)}" style="${champ}"></td>
       <td style="${cellule}"><input data-k="email" value="${h(l.email)}" style="${champ}"></td>
       <td style="${cellule}"><input data-k="naissance" value="${h(l.naissance)}" placeholder="JJ/MM/AAAA" style="${champ}${l.naissance ? "" : ";background:#fdecea"}"></td>
-      <td style="${cellule}"><input data-k="n" value="${h(l.n)}" inputmode="decimal" style="${champ};text-align:right;font-weight:700"></td></tr>`).join("");
+      <td style="${cellule}"><input data-k="n" value="${h(l.n)}" inputmode="decimal" style="${champ};text-align:center"></td></tr>`).join("");
   fond.innerHTML = `<div style="background:#fff;border-radius:12px;padding:16px;max-width:1100px;width:100%;max-height:94vh;display:flex;flex-direction:column;font:14px sans-serif">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px">
       <div><h3 style="margin:0">Commande Swile – ${h(mois)}</h3><small id="swTot" style="color:#555"></small></div>
@@ -1880,10 +1881,12 @@ function afficherCommandeSwile(mois, lignes) {
         <button class="btn" data-a="xlsx">⬇ Excel (.xlsx)</button>
         <button class="btn ghost" data-a="csv" title="Fichier texte : s\'ouvre mal dans Excel en ligne">⬇ CSV (texte)</button>
         <button class="btn ghost" data-a="fermer">Fermer</button></div></div>
-    <div style="font-size:12px;color:#555;margin-bottom:6px">Remplir le tableau ci dessous avec l'aide du site · Les cases sont modifiables (en rouge : date de naissance manquante).</div>
-    <div style="overflow:auto;border:1px solid #d0d7de;border-radius:6px">
-      <table style="border-collapse:collapse;width:100%;min-width:760px">
-        <thead><tr>${ENTETE_SWILE.map(t => `<th style="position:sticky;top:0;background:#1f2a44;color:#fff;text-align:left;padding:7px 8px;font-size:12px">${t}</th>`).join("")}</tr></thead>
+    <div style="font-size:12px;color:#555;margin-bottom:6px">Les cases sont modifiables (en rouge : date de naissance manquante).</div>
+    <div style="overflow:auto;border:1px solid #c8c8c8">
+      <table style="border-collapse:collapse;width:100%;min-width:760px;font:11pt Calibri,Carlito,Arial,sans-serif">
+        <colgroup><col style="width:9%"><col style="width:14%"><col style="width:18%"><col style="width:29%"><col style="width:16%"><col style="width:14%"></colgroup>
+        <thead><tr><td colspan="6" style="position:sticky;top:0;background:#fff;font-style:italic;padding:2px 3px;border:1px solid #e1e1e1;height:20px">Remplir le tableau ci dessous avec l'aide du site</td></tr>
+        <tr>${ENTETE_SWILE.map(t => `<th style="position:sticky;top:21px;background:#24408E;color:#fff;font-weight:700;text-align:center;padding:1px 18px 1px 3px;border:1px solid #24408E;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;position:sticky">${t}<span style="position:absolute;right:3px;top:2px;width:13px;height:14px;background:#fff;color:#444;font-size:8px;line-height:14px;text-align:center;border:1px solid #9a9a9a">▼</span></th>`).join("")}</tr></thead>
         <tbody>${corps}</tbody></table></div></div>`;
   document.body.appendChild(fond);
 
