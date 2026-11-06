@@ -838,9 +838,28 @@ function normNom(s) {
 // Pose les cases grises sur les salariés présents. Chaque ligne n'est traitée
 // qu'une fois (marqueur _gris) : si on enlève une case grise à la main, elle
 // ne revient pas au rechargement. Ne touche jamais une case déjà colorée.
+// Chaque mois de janvier (toutes années) : Forfait KMS grisé pour tout le monde,
+// même ceux qui ont une voiture, en attendant les justificatifs de l'année.
+// Posé une seule fois par ligne (_grisJanv) : un clic droit pour dégriser
+// quand le justificatif est reçu reste respecté.
+function griserKmJanvier(mois, rows) {
+  if (!/^janvier\s/i.test(String(mois).trim())) return false;
+  if (moisIndex(mois) < moisIndex("Janvier 2027")) return false; // janvier 2026 déjà payé : on n'y touche pas
+  let modif = false;
+  rows.forEach(r => {
+    if (!String(r.nom || "").trim() || r._grisJanv) return;
+    if (!r._hl) r._hl = {};
+    if (!(r._grisOff && r._grisOff.forfaitKm)) r._hl.forfaitKm_gris = "hl-grey";
+    r._grisJanv = true;
+    modif = true;
+  });
+  return modif;
+}
+
 function appliquerGrises(agence, mois, rows) {
+  const janv = griserKmJanvier(mois, rows);
   const src = (GRISES[agence] || {})[mois];
-  if (!src) return false;
+  if (!src) return janv;
   const parNom = {};
   Object.keys(src).forEach(n => { parNom[normNom(n)] = src[n]; });
   let modif = false;
@@ -854,7 +873,7 @@ function appliquerGrises(agence, mois, rows) {
     r._gris2 = true;
     modif = true;
   });
-  return modif;
+  return modif || janv;
 }
 
 // ---- Mois disponibles ----
@@ -888,6 +907,7 @@ async function pushSheet(agence, mois) {
   // sécurité : jamais d'envoi d'une feuille absente de la mémoire (ça l'effacerait)
   if (!store[agence] || !Array.isArray(store[agence][mois])) return;
   const rows = store[agence][mois];
+  retirerSortis(agence, mois, rows);
   setSyncStatus("saving");
   try {
     const resp = await fetch(
@@ -1023,7 +1043,8 @@ async function ensureSheetLoaded(agence, mois, depth) {
         // feuille existante : cases grises + reprise du mois d'avant, puis on enregistre
         const g = appliquerGrises(agence, mois, data.rows);
         const n = await reprendreNon(agence, mois, data.rows, depth);
-        if ((g || n) && depth === 0) pushSheet(agence, mois);
+        const x = retirerSortis(agence, mois, data.rows);
+        if ((g || n || x) && depth === 0) pushSheet(agence, mois);
         return;
       }
     }
@@ -1043,10 +1064,75 @@ async function ensureSheetLoaded(agence, mois, depth) {
     if (prevRows.length) depart = prevRows.map(r => [r.nom, r.embauche, r.contrat]);
   }
   store[agence][mois] = depart.map(s => emptyRow(s));
+  retirerSortis(agence, mois, store[agence][mois]);
   appliquerGrises(agence, mois, store[agence][mois]);
   // feuille pas encore créée : « NON » repris en mémoire seulement (ils
   // seront enregistrés avec la première saisie)
   await reprendreNon(agence, mois, store[agence][mois], depth);
+}
+
+// ---- Salariés sortis ----
+// Un salarié supprimé est noté « sorti à partir de tel mois » (feuille spéciale
+// « _sortis » de l'agence). Il est ensuite retiré automatiquement de ce mois et
+// de tous les suivants, à chaque ouverture et à chaque enregistrement : même un
+// mois créé plus tard, ou un autre onglet resté ouvert, ne peut plus le remettre.
+// Retaper exactement son nom dans un mois annule la sortie (réembauche).
+const SORTIS_INIT = { vendenheim: [["CAVILLIER Lova", "Septembre 2026"]] };
+const sortis = {}; // agence -> { cle: { nom, mois } }
+function urlSortis(agence) {
+  return "/api/sheet?agence=" + encodeURIComponent(agence) + "&mois=_sortis";
+}
+async function chargerSortis(agence) {
+  let data = null;
+  try {
+    const resp = await fetch(urlSortis(agence));
+    if (resp.ok) data = (await resp.json()).rows;
+    else if (resp.status !== 404) return; // problème réseau : on garde la version en mémoire
+  } catch (e) { return; }
+  const liste = (data && data.liste) || {};
+  if (!data || !data.init) {
+    (SORTIS_INIT[agence] || []).forEach(([nom, mois]) => {
+      if (!liste[nomCle(nom)]) liste[nomCle(nom)] = { nom, mois };
+    });
+    sortis[agence] = liste;
+    enregistrerSortis(agence);
+  } else sortis[agence] = liste;
+}
+function enregistrerSortis(agence) {
+  return fetch(urlSortis(agence), {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ rows: { init: true, liste: sortis[agence] || {} } }),
+  }).catch(() => {});
+}
+function estSorti(agence, mois, nom) {
+  const s = (sortis[agence] || {})[nomCle(nom)];
+  return !!s && moisIndex(mois) >= moisIndex(s.mois);
+}
+// retire (sur place) les salariés sortis ; renvoie true si la feuille a changé
+function retirerSortis(agence, mois, rows) {
+  let change = false;
+  for (let i = rows.length - 1; i >= 0; i--) {
+    if (String(rows[i].nom || "").trim() && estSorti(agence, mois, rows[i].nom)) {
+      rows.splice(i, 1); change = true;
+    }
+  }
+  return change;
+}
+function noterSortie(agence, mois, nom) {
+  const cle = nomCle(nom);
+  if (!cle) return;
+  sortis[agence] = sortis[agence] || {};
+  const s = sortis[agence][cle];
+  if (s && moisIndex(s.mois) <= moisIndex(mois)) return; // déjà sorti plus tôt
+  sortis[agence][cle] = { nom, mois };
+  enregistrerSortis(agence);
+}
+function annulerSortie(agence, nom) {
+  const cle = nomCle(nom);
+  if (!sortis[agence] || !sortis[agence][cle]) return;
+  delete sortis[agence][cle];
+  enregistrerSortis(agence);
 }
 
 // ---- Suppression d'un salarié : aussi dans les mois suivants ----
@@ -1096,6 +1182,7 @@ async function supprimerDansMoisSuivants(agence, mois, nom) {
 const propagationTimers = {};
 function planifierPropagation(row) {
   const agence = curAgence, mois = curMois;
+  if (estSorti(agence, mois, row.nom)) annulerSortie(agence, row.nom);
   clearTimeout(propagationTimers[row._id]);
   propagationTimers[row._id] = setTimeout(() => {
     delete propagationTimers[row._id];
@@ -1163,6 +1250,7 @@ async function switchSheet(agence, mois) {
     curMois = mois;
     const tbody = document.getElementById("tbody");
     if (tbody) tbody.innerHTML = '<tr><td style="padding:18px;color:#7a8a99;">Chargement…</td></tr>';
+    await chargerSortis(agence);
     await ensureSheetLoaded(agence, mois);
   } finally {
     chargementFeuille = false;
@@ -1481,6 +1569,7 @@ function render() {
       const agence = curAgence, mois = curMois;
       const i = rows.indexOf(row);
       if (i >= 0) rows.splice(i, 1);
+      if (nom) noterSortie(agence, mois, nom);
       saveStore();
       render();
       if (nom) await supprimerDansMoisSuivants(agence, mois, nom);
