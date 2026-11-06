@@ -1756,6 +1756,51 @@ function ficheProche(cle, fiches) {
   return bestD <= 2 ? best : null;
 }
 
+// Fichier Excel mis en forme comme la trame Swile : consigne en ligne 1,
+// en-têtes bleu foncé avec filtres (tableau Excel), colonnes ajustées.
+function chargerExcelJS() {
+  if (window.ExcelJS) return Promise.resolve();
+  return new Promise((ok, ko) => {
+    const essayer = (srcs) => {
+      if (!srcs.length) return ko(new Error("exceljs"));
+      const s = document.createElement("script");
+      s.src = srcs[0];
+      s.onload = () => window.ExcelJS ? ok() : essayer(srcs.slice(1));
+      s.onerror = () => essayer(srcs.slice(1));
+      document.head.appendChild(s);
+    };
+    essayer(["/static/exceljs.min.js", "https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"]);
+    setTimeout(() => ko(new Error("délai")), 10000);
+  });
+}
+async function excelCommandeSwile(ls) {
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet("Commande");
+  ws.columns = [{ width: 12 }, { width: 16 }, { width: 22 }, { width: 36 }, { width: 24 }, { width: 24 }];
+  ws.getCell("A1").value = "Remplir le tableau ci dessous avec l'aide du site";
+  ws.getCell("A1").font = { name: "Calibri", size: 11, italic: true };
+  const lignes = ls.map(l => [l.civilite || "MME", l.prenom || "", l.nom || "", l.email || "",
+    l.naissance || "", Number(String(l.n || 0).replace(",", ".")) || 0]);
+  ws.addTable({
+    name: "Commande", ref: "A2", headerRow: true,
+    style: { theme: "TableStyleMedium2", showRowStripes: false },
+    columns: ENTETE_SWILE.map(n => ({ name: n, filterButton: true })),
+    rows: lignes.length ? lignes : [["", "", "", "", "", 0]],
+  });
+  ws.getRow(2).eachCell(c => {
+    c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF203864" } };
+    c.font = { name: "Calibri", size: 11, bold: true, color: { argb: "FFFFFFFF" } };
+    c.alignment = { horizontal: "center", vertical: "middle" };
+  });
+  for (let r = 3; r < 3 + lignes.length; r++) {
+    ws.getRow(r).eachCell({ includeEmpty: true }, c => { c.font = { name: "Calibri", size: 11 }; });
+    ws.getCell(r, 6).alignment = { horizontal: "center" };
+  }
+  ws.views = [{ state: "frozen", ySplit: 2 }];
+  const buf = await wb.xlsx.writeBuffer();
+  return new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+}
+
 function chargerXlsx() {
   if (window.XLSX) return Promise.resolve();
   return new Promise((ok, ko) => {
@@ -1890,6 +1935,16 @@ function afficherCommandeSwile(mois, lignes) {
       return;
     }
     try {
+      // version mise en forme (en-têtes bleus, filtres)
+      await chargerExcelJS();
+      const blob = await excelCommandeSwile(ls);
+      telecharger(blob, nomFichier + ".xlsx");
+      return;
+    } catch (e) {
+      console.warn("Excel mis en forme indisponible :", e);
+    }
+    try {
+      // secours : Excel simple, sans mise en forme
       await chargerXlsx();
       const ws = XLSX.utils.aoa_to_sheet(tableau(ls));
       ws["!cols"] = [{ wch: 11 }, { wch: 16 }, { wch: 20 }, { wch: 34 }, { wch: 26 }, { wch: 26 }];
