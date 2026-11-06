@@ -2295,11 +2295,12 @@ function moisEnCours() {
   return nomMois(d.getFullYear() * 12 + d.getMonth());
 }
 // Les mois apparaissent tout seuls : à chaque ouverture, tous les mois
-// manquants jusqu'au mois en cours sont ajoutés à la liste (le 1er du mois,
-// le nouveau mois est donc déjà là).
+// manquants jusqu'au janvier de l'année N+2 sont ajoutés à la liste.
 function ajouterMoisJusquAuMoisEnCours() {
   const d = new Date();
-  const cible = d.getFullYear() * 12 + d.getMonth();
+  // on prépare à l'avance : jusqu'au mois de janvier qui suit l'année prochaine
+  // (ex. en novembre 2026 → jusqu'à janvier 2028)
+  const cible = (d.getFullYear() + 2) * 12;
   trierMois();
   let idx = moisIndex(MOIS[0]);
   if (idx < 0) return;
