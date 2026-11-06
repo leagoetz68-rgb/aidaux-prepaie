@@ -501,7 +501,6 @@ tbody td.cdicdd-td{padding:0 8px;width:1%;white-space:nowrap;text-align:center}
         <label for="mois">Mois</label>
         <div class="select-wrap"><select id="mois"></select></div>
       </div>
-      <button class="btn ghost" id="addMois" title="Ajouter le mois suivant"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Mois suivant</button>
       <div class="spacer"></div>
       <button class="btn ghost" id="addRow2"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Ajouter un salarié</button>
       <button class="btn secondary" id="exportCsv"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>Export CSV</button>
@@ -2170,7 +2169,7 @@ function initControls() {
   remplirMois();
   selM.addEventListener("change", () => { switchSheet(curAgence, selM.value); });
 
-  document.getElementById("addMois").addEventListener("click", ajouterMoisSuivant);
+  // plus de bouton « Mois suivant » : les mois s'ajoutent tout seuls
   document.getElementById("addRow2").addEventListener("click", addRow);
   document.getElementById("exportCsv").addEventListener("click", exportCsv);
   document.getElementById("exportTickets").addEventListener("click", exportTickets);
@@ -2297,8 +2296,7 @@ function moisEnCours() {
 }
 // Les mois apparaissent tout seuls : à chaque ouverture, tous les mois
 // manquants jusqu'au mois en cours sont ajoutés à la liste (le 1er du mois,
-// le nouveau mois est donc déjà là). Le bouton « Mois suivant » reste
-// disponible pour préparer un mois à l'avance.
+// le nouveau mois est donc déjà là).
 function ajouterMoisJusquAuMoisEnCours() {
   const d = new Date();
   const cible = d.getFullYear() * 12 + d.getMonth();
