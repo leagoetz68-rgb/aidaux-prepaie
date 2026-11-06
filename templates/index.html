@@ -2237,12 +2237,36 @@ function moisEnCours() {
   const d = new Date();
   return nomMois(d.getFullYear() * 12 + d.getMonth());
 }
+// Les mois apparaissent tout seuls : à chaque ouverture, tous les mois
+// manquants jusqu'au mois en cours sont ajoutés à la liste (le 1er du mois,
+// le nouveau mois est donc déjà là). Le bouton « Mois suivant » reste
+// disponible pour préparer un mois à l'avance.
+function ajouterMoisJusquAuMoisEnCours() {
+  const d = new Date();
+  const cible = d.getFullYear() * 12 + d.getMonth();
+  trierMois();
+  let idx = moisIndex(MOIS[0]);
+  if (idx < 0) return;
+  while (idx < cible) {
+    idx++;
+    const m = nomMois(idx);
+    if (MOIS.includes(m)) continue;
+    MOIS.push(m);
+    fetch("/api/mois", {
+      method: "POST", credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mois: m })
+    }).catch(() => {});
+  }
+  trierMois();
+}
 (async () => {
   initControls();
   initRowHighlight();
   initImportBanner();
   renderTabs();
   await chargerMoisServeur();
+  ajouterMoisJusquAuMoisEnCours();
   const courant = moisEnCours();
   if (MOIS.includes(courant)) curMois = courant;
   remplirMois();
