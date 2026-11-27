@@ -80,7 +80,7 @@
   }
   .topbar a.back:hover { background: rgba(255,255,255,.12); color: #fff; }
 
-  .container { max-width: 1500px; margin: 0 auto; padding: 20px 24px 60px; }
+  .container { max-width: none; margin: 0; padding: 12px 16px 16px; }
 
   /* ---- Toolbar card ---- */
   .toolbar {
@@ -278,7 +278,11 @@
     transition: background .1s ease;
   }
   tbody tr:last-child td { border-bottom: 0; }
-  tbody tr:hover td { background: #f7fafb; }
+  /* un salarié sur deux sur fond bleu-gris, pour suivre la ligne facilement */
+  @media (min-width: 701px) {
+    tbody tr:nth-child(even) td { background: #eef3f8; }
+  }
+  tbody tr:hover td { background: #e2f4f3; }
 
   /* ligne surlignée quand on saisit dans une de ses cases */
   tbody tr.row-selected td { background: var(--sel-bg); }
@@ -337,7 +341,7 @@
   td.hl-blue.hl-navy input { background: #eceefe !important; }
   td.hl-blue.hl-orange input { background: #fff0ea !important; }
   /* Case grise = ne prend pas les transports / pas de véhicule / pas d'avantage */
-  td.hl-grey, tbody tr:hover td.hl-grey, tbody tr.row-selected td.hl-grey {
+  td.hl-grey, tbody tr:hover td.hl-grey, tbody tr.row-selected td.hl-grey, tbody tr:nth-child(even) td.hl-grey {
     background: #c9ced5;
     -webkit-print-color-adjust: exact; print-color-adjust: exact;
   }
