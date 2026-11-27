@@ -35,8 +35,6 @@
     /* états des cases */
     --blue-bg: #cfe7fd;      /* surligné (double-clic) */
     --blue-edge: #8cc5f5;
-    --grey-a: #f0f2f5;       /* grisé (clic droit) : hachures claires */
-    --grey-b: #dfe3e9;
     --sel-bg: #fff8db;       /* ligne en cours de saisie */
     --shadow: 0 1px 2px rgba(16,24,40,.04), 0 4px 16px rgba(16,24,40,.05);
     --shadow-sm: 0 1px 2px rgba(16,24,40,.05);
@@ -340,14 +338,12 @@
   td.hl-blue.hl-orange input { background: #fff0ea !important; }
   /* Case grise = ne prend pas les transports / pas de véhicule / pas d'avantage */
   td.hl-grey, tbody tr:hover td.hl-grey, tbody tr.row-selected td.hl-grey {
-    background: repeating-linear-gradient(135deg, var(--grey-a) 0 5px, var(--grey-b) 5px 10px);
+    background: #c9ced5;
     -webkit-print-color-adjust: exact; print-color-adjust: exact;
   }
-  td.hl-grey input { background: transparent; color: var(--faint); font-weight: 600; }
-  /* gris + bleu sur la même case : bleu, avec les hachures par-dessus */
-  td.hl-grey.hl-blue, tbody tr:hover td.hl-grey.hl-blue {
-    background: repeating-linear-gradient(135deg, rgba(255,255,255,.5) 0 5px, transparent 5px 10px), var(--blue-bg) !important;
-  }
+  td.hl-grey input { background: transparent; color: #1f2933; font-weight: 700; }
+  /* gris + bleu sur la même case : le bleu l'emporte (comme avant) */
+  td.hl-grey.hl-blue input { color: var(--text); }
   /* un champ désactivé ne doit pas bloquer le double-clic sur la cellule */
   tbody input:disabled { pointer-events: none; }
   td.hl-teal input::placeholder { color: var(--teal-dark); opacity: 1; font-weight: 700; }
@@ -401,7 +397,6 @@
     .table-wrap { box-shadow: none; border: none; max-height: none; overflow: visible; }
     .topbar { background: var(--navy-deep) !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     tbody td { border-right: 1px solid var(--border); }
-    td.hl-grey { background: #d9d9d9 !important; }
   }
   /* CDI / CDD : seul le choix actif se voit, l'autre reste discret */
   tbody td.cdicdd-td{padding:0 8px;width:1%;white-space:nowrap;text-align:center}
@@ -532,7 +527,7 @@
     <div class="legend" id="legend">
       <span><i class="swatch" style="background:#f2f4f7"></i> « dès MM/AA » = ouverture après la période d'essai</span>
       <span><i class="swatch" style="background:#cfe7fd;border-color:#8cc5f5"></i> double-clic sur une case = surligner en bleu (re-double-clic pour enlever)</span>
-      <span><i class="swatch" style="background:repeating-linear-gradient(135deg,#f0f2f5 0 3px,#d5dae0 3px 6px)"></i> clic droit = griser / dégriser (repris les mois suivants)</span>
+      <span><i class="swatch" style="background:#c9ced5"></i> clic droit = griser / dégriser (repris les mois suivants)</span>
       <span class="hint">Ticket resto : déblocage auto après 2 mois d'essai. Double-cliquez la case pour la marquer « NON » (ne bénéficie pas).</span>
     </div>
 
