@@ -342,6 +342,7 @@
     -webkit-print-color-adjust: exact; print-color-adjust: exact;
   }
   td.hl-grey input { background: transparent; color: #1f2933; font-weight: 700; }
+  td.hl-grey input::placeholder { color: #1f2933; opacity: 1; font-weight: 700; }
   /* gris + bleu sur la même case : le bleu l'emporte (comme avant) */
   td.hl-grey.hl-blue input { color: var(--text); }
   /* un champ désactivé ne doit pas bloquer le double-clic sur la cellule */
@@ -1478,6 +1479,8 @@ function render() {
       }
       if (col.minWidth) inp.style.minWidth = col.minWidth + "px";
       if (col.left) inp.style.textAlign = "left";
+      // Case grisée vide : affiche « NON » (affichage seulement, rien n'est enregistré)
+      if (td.classList.contains("hl-grey")) inp.placeholder = "NON";
       // Double-clic sur une case = surligneur bleu (re-double-clic = enlève le bleu).
       // Un simple clic sert juste à se placer dans la case pour écrire.
       // Exception Ticket resto : simple clic = bleu, double-clic = « NON » (inchangé).
