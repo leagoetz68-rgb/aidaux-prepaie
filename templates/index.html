@@ -5,40 +5,48 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AID'AUX — Pré-paie</title>
 <link rel="manifest" href="/manifest.webmanifest">
-<meta name="theme-color" content="#1B2A6B">
+<meta name="theme-color" content="#0b1660">
 <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Aid'Aux Pré-paie">
 <script>if('serviceWorker' in navigator){addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="icon" type="image/x-icon" href="{{ url_for('favicon') }}">
 <style>
   :root {
     /* Palette AID'AUX : turquoise, bleu marine, orange + neutres */
     --teal: #00BBB4;
     --teal-dark: #0a8f88;
+    --teal-soft: #e5f6f5;
     --navy: #000F9F;
-    --navy-deep: #0a1560;
-    --indigo: #000F9F;
+    --navy-deep: #0b1660;
+    --indigo: #1b2a6b;
     --orange: #FF4713;
-    --bg: #eef2f5;
+    --bg: #f5f7f9;
     --card: #ffffff;
-    --text: #1f2a37;
-    --muted: #6b7a86;
-    --border: #e4ebef;
-    --border-strong: #d3dde3;
-    --shadow: 0 10px 30px rgba(0,15,159,0.08);
-    --shadow-sm: 0 2px 8px rgba(0,15,159,0.06);
+    --text: #1f2933;
+    --muted: #6b7785;
+    --faint: #9aa5b1;
+    --border: #e8ecf0;
+    --border-strong: #d8dee4;
+    /* états des cases */
+    --blue-bg: #cfe7fd;      /* surligné (double-clic) */
+    --blue-edge: #8cc5f5;
+    --grey-a: #f0f2f5;       /* grisé (clic droit) : hachures claires */
+    --grey-b: #dfe3e9;
+    --sel-bg: #fff8db;       /* ligne en cours de saisie */
+    --shadow: 0 1px 2px rgba(16,24,40,.04), 0 4px 16px rgba(16,24,40,.05);
+    --shadow-sm: 0 1px 2px rgba(16,24,40,.05);
   }
   * { box-sizing: border-box; }
   html, body { height: 100%; }
   body {
     margin: 0;
     font-family: "Inter", "Segoe UI", system-ui, Arial, sans-serif;
-    background:
-      radial-gradient(1100px 500px at 100% -10%, rgba(0,187,180,0.10), transparent 60%),
-      radial-gradient(900px 500px at -10% 0%, rgba(106,27,154,0.08), transparent 55%),
-      var(--bg);
+    background: var(--bg);
     color: var(--text);
     min-height: 100vh;
     -webkit-font-smoothing: antialiased;
@@ -46,75 +54,71 @@
 
   /* ---- Header ---- */
   .topbar {
-    background: linear-gradient(100deg, #0a1560 0%, #1a2aa0 55%, #00BBB4 140%);
+    background: var(--navy-deep);
     color: #fff;
-    padding: 16px 28px;
+    padding: 10px 28px;
     display: flex;
     align-items: center;
     gap: 16px;
-    box-shadow: var(--shadow-sm);
   }
-  .brand { display: flex; align-items: center; gap: 14px; }
+  .brand { display: flex; align-items: center; gap: 12px; }
   .brand .logo-badge {
-    width: 46px; height: 46px;
-    background: #fff; border-radius: 12px;
+    width: 38px; height: 38px;
+    background: #fff; border-radius: 10px;
     display: flex; align-items: center; justify-content: center;
-    box-shadow: 0 4px 14px rgba(0,0,0,0.18);
   }
-  .brand .logo-badge img { height: 34px; display: block; }
-  .brand .titles h1 { font-size: 1.18rem; margin: 0; font-weight: 700; letter-spacing: .2px; }
-  .brand .titles p { margin: 2px 0 0; font-size: .8rem; color: rgba(255,255,255,.8); }
+  .brand .logo-badge img { height: 28px; display: block; }
+  .brand .titles h1 { font-size: 1.02rem; margin: 0; font-weight: 700; letter-spacing: .1px; }
+  .brand .titles p { margin: 1px 0 0; font-size: .74rem; color: rgba(255,255,255,.65); }
   .topbar a.back {
     margin-left: auto;
-    color: #fff;
+    color: rgba(255,255,255,.9);
     text-decoration: none;
-    font-size: .88rem;
+    font-size: .82rem;
     font-weight: 600;
-    border: 1px solid rgba(255,255,255,.35);
-    padding: 8px 16px;
-    border-radius: 999px;
+    padding: 7px 12px;
+    border-radius: 8px;
     transition: background .15s ease;
-    backdrop-filter: blur(4px);
   }
-  .topbar a.back:hover { background: rgba(255,255,255,.15); }
+  .topbar a.back:hover { background: rgba(255,255,255,.12); color: #fff; }
 
-  .container { max-width: 1500px; margin: 0 auto; padding: 22px 24px 60px; }
+  .container { max-width: 1500px; margin: 0 auto; padding: 20px 24px 60px; }
 
   /* ---- Toolbar card ---- */
   .toolbar {
     display: flex;
     flex-wrap: wrap;
-    gap: 10px 10px;
+    gap: 10px;
     align-items: center;
     background: var(--card);
     border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 16px 18px;
+    border-radius: 12px;
+    padding: 12px 14px;
     box-shadow: var(--shadow-sm);
   }
-  .toolbar > .btn { padding: 10px 14px; white-space: nowrap; }
+  .toolbar > .btn { padding: 9px 13px; white-space: nowrap; }
   /* Alignement : boutons et listes déroulantes sur la même ligne de base, à la même hauteur */
   @media (min-width: 701px) {
     .toolbar { align-items: flex-end; }
-    .toolbar select, .toolbar > .btn { height: 44px; box-sizing: border-box; }
+    .toolbar select, .toolbar > .btn { height: 40px; box-sizing: border-box; }
     .toolbar > .btn { padding-top: 0; padding-bottom: 0; }
   }
   .toolbar > .spacer + .btn { margin-left: 0; }
-  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field { display: flex; flex-direction: column; gap: 4px; }
   .field label {
-    font-size: .68rem;
+    font-size: .66rem;
     text-transform: uppercase;
     letter-spacing: .06em;
     color: var(--muted);
-    font-weight: 700;
+    font-weight: 600;
   }
   .select-wrap { position: relative; }
   select {
     appearance: none;
-    padding: 10px 38px 10px 14px;
+    padding: 9px 36px 9px 12px;
     border: 1px solid var(--border-strong);
-    border-radius: 10px;
-    font-size: .95rem;
+    border-radius: 8px;
+    font-size: .92rem;
     font-weight: 600;
     color: var(--indigo);
     background: #fff;
@@ -123,10 +127,10 @@
     transition: border-color .15s ease, box-shadow .15s ease;
   }
   select:hover { border-color: var(--teal); }
-  select:focus { outline: none; border-color: var(--teal); box-shadow: 0 0 0 3px rgba(0,187,180,.2); }
+  select:focus { outline: none; border-color: var(--teal); box-shadow: 0 0 0 3px rgba(0,187,180,.18); }
   .select-wrap::after {
     content: "▾";
-    position: absolute; right: 14px; top: 50%;
+    position: absolute; right: 13px; top: 50%;
     transform: translateY(-50%);
     color: var(--muted); font-size: .8rem; pointer-events: none;
   }
@@ -134,33 +138,27 @@
 
   .btn {
     display: inline-flex; align-items: center; gap: 7px;
-    padding: 10px 18px;
-    border: none;
-    border-radius: 10px;
-    font-size: .9rem;
+    padding: 9px 16px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    font-size: .86rem;
     font-weight: 600;
     cursor: pointer;
     color: #fff;
     background: var(--orange);
-    box-shadow: 0 4px 12px rgba(255,71,19,.28);
-    transition: transform .12s ease, box-shadow .12s ease, background .15s ease;
+    transition: background .15s ease, border-color .15s ease, color .15s ease;
   }
-  .btn:hover { background: #e8390c; transform: translateY(-1px); }
-  .btn:active { transform: translateY(0); }
-  .btn.secondary {
-    background: #e6f7f6; color: var(--teal-dark); box-shadow: none;
-    border: 1px solid #bfe9e6;
+  .btn:hover { background: #e8390c; }
+  .btn.secondary, .btn.ghost {
+    background: #fff; color: var(--text);
+    border-color: var(--border-strong);
   }
-  .btn.secondary:hover { background: var(--teal-dark); color: #fff; border-color: var(--teal-dark); }
+  .btn.secondary .ic, .btn.ghost .ic { color: var(--teal-dark); }
+  .btn.secondary:hover, .btn.ghost:hover { background: var(--teal-soft); border-color: var(--teal); color: var(--teal-dark); }
   .btn .ic {
     width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
     stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
   }
-  .btn.ghost {
-    background: #fff; color: var(--indigo);
-    border: 1px solid var(--border-strong); box-shadow: none;
-  }
-  .btn.ghost:hover { background: #f3f7f9; border-color: var(--teal); }
 
   /* ---- Fenêtre « Tickets resto depuis Ximi » ---- */
   .tx-fermer {
@@ -191,82 +189,73 @@
   }
   #ticketsXimi a { color: var(--teal-dark); font-weight: 600; }
 
-  /* ---- Stat chips ---- */
-  .stats { display: flex; flex-wrap: wrap; gap: 12px; margin: 18px 0 6px; }
+  /* ---- Compteur salariés (petite pastille discrète) ---- */
+  .stats { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 16px 0 0; }
   .chip {
-    display: flex; align-items: center; gap: 12px;
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    padding: 12px 16px;
-    box-shadow: var(--shadow-sm);
-    min-width: 150px;
+    display: flex; align-items: center; gap: 8px;
+    background: transparent; border: 0; padding: 0; box-shadow: none; min-width: 0;
   }
-  .chip .ic {
-    width: 38px; height: 38px; border-radius: 10px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 1.1rem; color: #fff; flex: none;
+  .chip .ic { display: none; }
+  .chip > div:last-child { display: flex; align-items: baseline; gap: 6px; }
+  .chip .k { font-size: .82rem; color: var(--muted); font-weight: 500; }
+  .chip .v {
+    font-size: .82rem; font-weight: 700; color: var(--indigo); line-height: 1;
+    background: #fff; border: 1px solid var(--border-strong); border-radius: 999px; padding: 3px 9px;
   }
-  .chip .ic.a { background: linear-gradient(135deg,#00BBB4,#0a9a94); }
-  .chip .ic.b { background: linear-gradient(135deg,#FF4713,#e8390c); }
-  .chip .ic.c { background: linear-gradient(135deg,#000F9F,#0a1560); }
-  .chip .k { font-size: .68rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 700; }
-  .chip .v { font-size: 1.02rem; font-weight: 700; color: var(--indigo); line-height: 1.1; }
+  .chip .k::after { content: ""; }
 
-  /* ---- Tabs ---- */
-  .tabs { display: flex; gap: 6px; margin: 20px 0 0; flex-wrap: wrap; }
+  /* ---- Onglets (soulignés) ---- */
+  .tabs {
+    display: flex; gap: 22px; margin: 6px 0 0; flex-wrap: wrap;
+    border-bottom: 1px solid var(--border-strong);
+  }
   .tab {
-    padding: 10px 18px;
-    border: 1px solid var(--border-strong);
-    border-bottom: none;
-    border-radius: 12px 12px 0 0;
-    background: #eef2f5;
+    padding: 10px 2px;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    background: none;
     color: var(--muted);
+    font: inherit;
     font-size: .9rem;
-    font-weight: 700;
+    font-weight: 600;
     cursor: pointer;
-    transition: background .12s ease, color .12s ease;
+    transition: color .12s ease, border-color .12s ease;
   }
-  .tab:hover { background: #e4eaef; color: var(--navy); }
-  .tab.active {
-    background: var(--card);
-    color: var(--navy);
-    box-shadow: 0 -2px 6px rgba(0,15,159,.06);
-    position: relative;
-  }
-  .tab.active::after {
-    content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px;
-    background: var(--teal); border-radius: 3px 3px 0 0;
-  }
+  .tab:hover { color: var(--indigo); }
+  .tab.active { color: var(--indigo); border-bottom-color: var(--teal); }
 
-  /* ---- Legend ---- */
+  /* ---- Légende ---- */
   .legend {
-    display: flex; gap: 18px; flex-wrap: wrap;
-    font-size: .78rem; color: var(--muted);
-    align-items: center; margin: 12px 2px 14px;
+    display: flex; gap: 6px 18px; flex-wrap: wrap;
+    font-size: .76rem; color: var(--muted);
+    align-items: center; margin: 12px 2px 12px;
   }
-  .legend span { display: inline-flex; align-items: center; gap: 7px; }
-  .swatch { width: 15px; height: 15px; border-radius: 4px; border: 1px solid #0002; display: inline-block; }
-  .legend .hint { margin-left: auto; font-style: italic; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .swatch { width: 14px; height: 14px; border-radius: 4px; border: 1px solid #0001; display: inline-block; }
+  .legend .hint { margin-left: auto; font-style: normal; color: var(--faint); }
 
-  /* ---- Table ---- */
+  /* ---- Tableau ---- */
   .table-wrap {
     overflow: auto;
     /* le tableau défile dans son cadre : la ligne des titres reste visible */
     max-height: calc(100vh - 150px);
     background: var(--card);
     border: 1px solid var(--border);
-    border-radius: 16px;
+    border-radius: 12px;
     box-shadow: var(--shadow);
   }
   table { border-collapse: separate; border-spacing: 0; width: 100%; font-size: .84rem; }
   thead th {
-    background: #f4f8fa;
-    color: var(--indigo);
-    font-weight: 700;
-    padding: 11px 8px;
+    background: #fafbfc;
+    color: var(--muted);
+    font-size: .72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    line-height: 1.25;
+    padding: 10px 8px;
     border-bottom: 1px solid var(--border-strong);
-    border-right: 1px solid var(--border);
     text-align: center;
     position: sticky;
     top: 0;
@@ -274,28 +263,28 @@
     white-space: nowrap;
   }
   thead tr.sub th {
-    background: #eaf1f4;
-    font-size: .74rem;
-    font-weight: 600;
-    color: #3b4a72;
+    background: #f4f6f8;
+    font-size: .7rem;
+    color: var(--muted);
     top: 44px;
   }
-  thead th.group { background: #e7eefc; color: #26348c; }
+  thead th.group { background: #fafbfc; }
 
   tbody td {
     border-bottom: 1px solid var(--border);
-    border-right: 1px solid var(--border);
     padding: 0;
     text-align: center;
     vertical-align: middle;
+    border-right: 1px solid #f1f3f5;
+    background: #fff;
+    transition: background .1s ease;
   }
-  tbody tr:hover td { background: #f6fbfc; }
-  tbody tr:hover td.name { background: #eef8f7; }
+  tbody tr:last-child td { border-bottom: 0; }
+  tbody tr:hover td { background: #f7fafb; }
 
   /* ligne surlignée quand on saisit dans une de ses cases */
-  tbody tr.row-selected td {
-    box-shadow: inset 0 0 0 9999px rgba(255, 214, 0, 0.28);
-  }
+  tbody tr.row-selected td { background: var(--sel-bg); }
+  tbody tr.row-selected td.rownum { box-shadow: inset 3px 0 0 #f5c400; }
 
   /* sticky first columns */
   /* « # » et « Salarié » restent visibles quand on défile vers la droite */
@@ -307,24 +296,23 @@
     text-align: left;
     font-weight: 600;
     white-space: nowrap;
-    padding: 0 8px;
-    background: #fbfdfd;
-    box-shadow: 1px 0 0 var(--border);
+    padding: 0 6px;
+    box-shadow: inset -1px 0 0 var(--border);
   }
-  tbody tr:nth-child(even) td.name { background: #f5f9f9; }
 
   tbody input {
     width: 100%;
     border: none;
     background: transparent;
-    padding: 9px 6px;
+    padding: 10px 6px;
     font: inherit;
+    font-variant-numeric: tabular-nums;
     text-align: center;
     min-width: 74px;
     color: var(--text);
   }
   tbody td.name input { text-align: left; font-weight: 600; min-width: 210px; color: var(--indigo); }
-  thead th.hname { min-width: 222px; text-align: left; padding-left: 12px; box-shadow: 1px 0 0 var(--border-strong); }
+  thead th.hname { min-width: 222px; text-align: left; padding-left: 12px; box-shadow: inset -1px 0 0 var(--border); }
   tbody td.wide input { text-align: left; min-width: 320px; }
   tbody input:focus {
     outline: none;
@@ -332,52 +320,60 @@
     background: #fff;
     border-radius: 6px;
   }
-  /* surlignage aux couleurs AID'AUX */
-  td.hl-teal   input { background: var(--teal);   color:#fff; font-weight: 700; border-radius: 6px; }
-  td.hl-orange input { background: var(--orange); color:#fff; font-weight: 700; border-radius: 6px; }
-  td.hl-navy   input { background: var(--navy);   color:#fff; font-weight: 700; border-radius: 6px; }
+  /* « NON » Ticket resto et anciennes couleurs : pastille douce au lieu d'un aplat */
+  td.hl-teal input, td.hl-orange input, td.hl-navy input {
+    font-weight: 700; border-radius: 999px; font-size: .74rem; letter-spacing: .04em;
+    width: auto; min-width: 0; max-width: 64px; padding: 3px 0; margin: 6px auto; display: block;
+  }
+  td.hl-teal   input { background: var(--teal-soft); color: var(--teal-dark); box-shadow: inset 0 0 0 1px #b5e6e3; }
+  td.hl-orange input { background: #fff0ea; color: #c2410c; box-shadow: inset 0 0 0 1px #ffd0bf; }
+  td.hl-navy   input { background: #eceefe; color: var(--navy); box-shadow: inset 0 0 0 1px #c9cdf6; }
   /* surligneur bleu : double-clic pour poser/enlever (Ticket resto : simple clic) */
-  td.hl-blue { background: #8fd3ff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  td.hl-blue input { background: #8fd3ff !important; color: var(--text); font-weight: 600; border-radius: 6px; }
-  tbody tr.row-selected td.hl-blue { box-shadow: none; }
+  td.hl-blue { background: var(--blue-bg) !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  td.hl-blue input { background: transparent !important; color: var(--text); font-weight: 600; }
+  td.name.hl-blue input { color: var(--indigo); }
+  tbody tr:hover td.hl-blue { background: #c3e0fb !important; }
   /* une case désactivée (NON, ticket bloqué) laisse passer les clics vers la case */
   td input:disabled { pointer-events: none; }
-  td.hl-blue.hl-navy input { background: var(--navy) !important; color:#fff; font-weight:700; box-shadow: inset 0 0 0 4px #8fd3ff; }
-  td.hl-blue.hl-orange input { background: var(--orange) !important; color:#fff; font-weight:700; box-shadow: inset 0 0 0 4px #8fd3ff; }
+  td.hl-blue.hl-navy input, td.hl-blue.hl-orange input { box-shadow: inset 0 0 0 1px var(--blue-edge); }
+  td.hl-blue.hl-navy input { background: #eceefe !important; }
+  td.hl-blue.hl-orange input { background: #fff0ea !important; }
   /* Case grise = ne prend pas les transports / pas de véhicule / pas d'avantage */
-  td.hl-grey { background: #9a9a9a; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  td.hl-grey input { background: #9a9a9a; color:#fff; font-weight: 600; border-radius: 6px; }
+  td.hl-grey, tbody tr:hover td.hl-grey, tbody tr.row-selected td.hl-grey {
+    background: repeating-linear-gradient(135deg, var(--grey-a) 0 5px, var(--grey-b) 5px 10px);
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  td.hl-grey input { background: transparent; color: var(--faint); font-weight: 600; }
+  /* gris + bleu sur la même case : bleu, avec les hachures par-dessus */
+  td.hl-grey.hl-blue, tbody tr:hover td.hl-grey.hl-blue {
+    background: repeating-linear-gradient(135deg, rgba(255,255,255,.5) 0 5px, transparent 5px 10px), var(--blue-bg) !important;
+  }
   /* un champ désactivé ne doit pas bloquer le double-clic sur la cellule */
   tbody input:disabled { pointer-events: none; }
-  td.hl-teal input::placeholder,
-  td.hl-orange input::placeholder,
-  td.hl-navy input::placeholder { color:#fff; opacity:.95; font-weight:700; }
+  td.hl-teal input::placeholder { color: var(--teal-dark); opacity: 1; font-weight: 700; }
+  td.hl-orange input::placeholder { color: #c2410c; opacity: 1; font-weight: 700; }
+  td.hl-navy input::placeholder { color: var(--navy); opacity: 1; font-weight: 700; }
 
   /* Ticket resto : déblocage auto */
-  .th-sub { display:block; font-size:.62rem; font-weight:600; color:var(--teal-dark); margin-top:2px; }
-  td.tr-lock { background: #f6f8fa; }
+  .th-sub { display:block; font-size:.62rem; font-weight:500; color:var(--faint); margin-top:2px; text-transform: none; letter-spacing: 0; }
   .tr-badge {
     display: inline-block;
-    padding: 3px 10px;
+    padding: 2px 8px;
     border-radius: 999px;
-    background: #eef1fb;
-    border: 1px solid #d5daf3;
-    color: var(--navy);
-    font-size: .74rem;
-    font-weight: 700;
-    white-space: nowrap;
-  }
-  td.tr-ok { background: #e6f7f6; }
-  td.tr-ok input { color: var(--teal-dark); font-weight:600; }
-
-  td.rownum {
-    background: #f0f5f7;
+    background: #f2f4f7;
     color: var(--muted);
     font-size: .72rem;
     font-weight: 600;
+    white-space: nowrap;
+  }
+  td.tr-ok input { color: var(--teal-dark); font-weight: 700; }
+
+  td.rownum {
+    color: var(--faint);
+    font-size: .72rem;
+    font-weight: 500;
     width: 44px;
     text-align: center;
-    box-shadow: 1px 0 0 var(--border);
   }
   th.rownum { width: 44px; }
 
@@ -385,15 +381,16 @@
   td.del button {
     border: none;
     background: transparent;
-    color: #c2c9d0;
+    color: transparent;
     cursor: pointer;
-    font-size: 1rem;
+    font-size: .9rem;
     line-height: 1;
     padding: 6px 8px;
     border-radius: 8px;
     transition: color .12s ease, background .12s ease;
   }
-  td.del button:hover { color: var(--orange); background: #ffe9e2; }
+  tbody tr:hover td.del button { color: #c2c9d0; }
+  tbody tr:hover td.del button:hover, td.del button:focus { color: var(--orange); background: #ffe9e2; }
 
   .row-actions { margin-top: 16px; }
 
@@ -402,13 +399,19 @@
     body { background: #fff; }
     .container { padding: 0; max-width: none; }
     .table-wrap { box-shadow: none; border: none; max-height: none; overflow: visible; }
-    .topbar { background: #101a6b !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .topbar { background: var(--navy-deep) !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    tbody td { border-right: 1px solid var(--border); }
+    td.hl-grey { background: #d9d9d9 !important; }
   }
-tbody td.cdicdd-td{padding:0 8px;width:1%;white-space:nowrap;text-align:center}
-.cdicdd{display:inline-flex;gap:4px}
-.cdicdd button{font:inherit;font-size:11px;font-weight:700;padding:3px 8px;border-radius:999px;border:1px solid #cfd9e2;background:#fff;color:#8a99a8;cursor:pointer;transition:all .15s}
-.cdicdd button:hover{border-color:var(--teal);color:var(--teal-dark)}
-.cdicdd button.on{background:var(--teal);border-color:var(--teal);color:#fff}
+  /* CDI / CDD : seul le choix actif se voit, l'autre reste discret */
+  tbody td.cdicdd-td{padding:0 8px;width:1%;white-space:nowrap;text-align:center}
+  .cdicdd{display:inline-flex;gap:2px;padding:2px;border-radius:999px;background:transparent;transition:background .15s}
+  .cdicdd button{font:inherit;font-size:11px;font-weight:700;letter-spacing:.03em;padding:3px 9px;border-radius:999px;border:0;background:transparent;color:#b3bdc7;cursor:pointer;transition:all .15s}
+  tbody tr:hover .cdicdd{background:#eef2f5}
+  tbody tr:hover .cdicdd button{color:#8a96a3}
+  .cdicdd button:hover{color:var(--teal-dark) !important}
+  .cdicdd button.on, tbody tr:hover .cdicdd button.on{background:var(--teal);color:#fff}
+  .cdicdd button.on:hover{color:#fff !important}
   /* ---- Téléphone ---- */
   @media (max-width: 700px) {
     html, body { overflow-x: hidden; max-width: 100vw; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
@@ -460,6 +463,10 @@ tbody td.cdicdd-td{padding:0 8px;width:1%;white-space:nowrap;text-align:center}
     #grid tbody td.name input { font-size: 1.05rem; font-weight: 700; border: 0; padding: 2px 0; }
     #grid tbody td.del { position: absolute !important; top: 8px; right: 8px; border: 0 !important; padding: 0 !important; }
     #grid tbody td.del::before { display: none; }
+    #grid tbody td.del { background: transparent !important; }
+    /* pas de survol au doigt : CDI / CDD restent lisibles */
+    .cdicdd { background: #eef2f5; }
+    .cdicdd button { color: #8a96a3; padding: 5px 12px; }
     #grid tbody td.tr-lock .tr-badge { margin-left: 0; }
     .topbar { flex-wrap: wrap; padding: 12px 14px; gap: 8px 12px; }
     .topbar .brand { width: 100%; }
@@ -523,9 +530,9 @@ tbody td.cdicdd-td{padding:0 8px;width:1%;white-space:nowrap;text-align:center}
     <div class="tabs" id="tabs"></div>
 
     <div class="legend" id="legend">
-      <span><i class="swatch" style="background:#f0f3f6"></i> « dès MM/AA » = ouverture après la période d'essai</span>
-      <span><i class="swatch" style="background:#8fd3ff"></i> double-clic sur une case = surligner en bleu (re-double-clic pour enlever)</span>
-      <span><i class="swatch" style="background:#9a9a9a"></i> clic droit = griser / dégriser (repris les mois suivants)</span>
+      <span><i class="swatch" style="background:#f2f4f7"></i> « dès MM/AA » = ouverture après la période d'essai</span>
+      <span><i class="swatch" style="background:#cfe7fd;border-color:#8cc5f5"></i> double-clic sur une case = surligner en bleu (re-double-clic pour enlever)</span>
+      <span><i class="swatch" style="background:repeating-linear-gradient(135deg,#f0f2f5 0 3px,#d5dae0 3px 6px)"></i> clic droit = griser / dégriser (repris les mois suivants)</span>
       <span class="hint">Ticket resto : déblocage auto après 2 mois d'essai. Double-cliquez la case pour la marquer « NON » (ne bénéficie pas).</span>
     </div>
 
