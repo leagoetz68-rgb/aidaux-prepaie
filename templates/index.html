@@ -343,9 +343,6 @@
   }
   td.hl-grey input { background: transparent; color: #1f2933; font-weight: 700; }
   td.hl-grey input::placeholder { color: #1f2933; opacity: 1; font-weight: 700; }
-  /* gris + bleu sur la même case : fond gris + cadre bleu, pour voir les deux */
-  td.hl-grey.hl-blue, tbody tr:hover td.hl-grey.hl-blue { background: #c9ced5 !important; box-shadow: inset 0 0 0 3px #6fb4f0; }
-  td.hl-grey.hl-blue input { color: var(--text); }
   /* un champ désactivé ne doit pas bloquer le double-clic sur la cellule */
   tbody input:disabled { pointer-events: none; }
   td.hl-teal input::placeholder { color: var(--teal-dark); opacity: 1; font-weight: 700; }
@@ -1414,9 +1411,15 @@ function render() {
         row._hl[col.key] = "";
         cleaned = true;
       }
+      const grisKey = col.key + "_gris";
+      // Une case est soit grise, soit bleue, jamais les deux : si les deux
+      // ont été posés (anciennes données), on garde le gris.
+      if (col.type !== "ticket" && row._hl[grisKey] === "hl-grey" && row._hl[col.key] === "hl-blue") {
+        row._hl[col.key] = "";
+        cleaned = true;
+      }
       let hl = row._hl[col.key];
       if (hl) td.classList.add(hl);
-      const grisKey = col.key + "_gris";
       if (col.type !== "ticket" && row._hl[grisKey] === "hl-grey") td.classList.add("hl-grey");
       // Clic droit = griser / dégriser la case (ex. pas de voiture → KMS grisés).
       // Le gris est repris automatiquement les mois suivants.
@@ -1430,6 +1433,7 @@ function render() {
           } else {
             row._hl[grisKey] = "hl-grey";
             delete row._grisOff[col.key];
+            if (row._hl[col.key] === "hl-blue") row._hl[col.key] = ""; // gris remplace le bleu
           }
           saveStore();
           render();
@@ -1490,6 +1494,15 @@ function render() {
         const on = row._hl[bleuKey] !== "hl-blue";
         row._hl[bleuKey] = on ? "hl-blue" : "";
         if (bleuKey === col.key) hl = row._hl[bleuKey];
+        // bleu remplace le gris (une case est soit grise, soit bleue)
+        if (on && col.type !== "ticket" && row._hl[grisKey] === "hl-grey") {
+          row._hl[grisKey] = "";
+          row._grisOff = row._grisOff || {};
+          row._grisOff[col.key] = true;
+          saveStore();
+          render();
+          return;
+        }
         td.classList.toggle("hl-blue", on);
         saveStore();
         if (!td.isConnected) render(); // le tableau a été redessiné entre-temps
